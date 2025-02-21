@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -95,7 +95,6 @@ namespace GKCore.Interfaces
     public interface IListSource
     {
         IBaseContext BaseContext { get; }
-        bool ColumnsHaveBeenChanged { get; set; }
         List<MapColumnRec> ColumnsMap { get; }
         ExtObservableList<ContentItem> ContentList { get; }
         ExternalFilterHandler ExternalFilter { get; set; }
@@ -105,6 +104,7 @@ namespace GKCore.Interfaces
         int TotalCount { get; }
         QuickFilterParams QuickFilter { get; }
 
+        void Clear();
         void AddCondition(byte columnId, ConditionKind condition, string value);
         void ChangeColumnWidth(int colIndex, int colWidth);
         string[] CreateFields();
@@ -138,6 +138,9 @@ namespace GKCore.Interfaces
         int GetFieldColumnId(string[] fields, string fieldName);
         int IndexOfItem(object data);
         bool IsColumnAutosize(int colIndex);
+        void OnItemSelected(int itemIndex, object rowData);
+        void RestoreSettings();
+        void SaveSettings();
         void SortContents(int sortColumn, bool sortAscending);
         void UpdateColumns(IListView listView);
         void UpdateContents();

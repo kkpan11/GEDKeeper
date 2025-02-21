@@ -1,6 +1,6 @@
 /*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -24,6 +24,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using BSLib;
 using GKCore;
@@ -42,6 +43,9 @@ using GKUI.Themes;
 
 namespace GKUI.Platform
 {
+    using CommonDialog = Forms.CommonDialog;
+
+
     /// <summary>
     /// The main implementation of the platform-specific application's host for
     /// WinForms.
@@ -60,12 +64,12 @@ namespace GKUI.Platform
 
         private void OnApplicationExit(object sender, EventArgs e)
         {
-            //AppHost.Instance.SaveLastBases();
+            ApplicationExit();
         }
 
-        public override void Init(string[] args, bool isMDI)
+        public override async Task Init(string[] args, bool isMDI)
         {
-            base.Init(args, isMDI);
+            await base.Init(args, isMDI);
             Application.ApplicationExit += OnApplicationExit;
         }
 
@@ -104,8 +108,11 @@ namespace GKUI.Platform
             return (ownerForm == null) ? IntPtr.Zero : ownerForm.Handle;
         }
 
-        public override bool ShowModalX(ICommonDialog dialog, IView owner, bool keepModeless = false)
+        public override async Task<bool> ShowModalAsync(ICommonDialog dialog, IView owner, bool keepModeless = false)
         {
+            var wfModal = dialog as CommonDialog;
+            if (wfModal == null) return false;
+
             IntPtr mainHandle = GetTopWindowHandle();
 
             if (keepModeless) {
@@ -113,16 +120,18 @@ namespace GKUI.Platform
                     if (win is IBaseWindow) {
                         IntPtr handle = ((Form)win).Handle;
 
-                        #if !MONO
+#if !MONO
                         PostMessageExt(handle, WM_KEEPMODELESS, IntPtr.Zero, IntPtr.Zero);
-                        #endif
+#endif
                     }
                 }
             }
 
-            UIHelper.CenterFormByParent((Form)dialog, mainHandle);
+            // for WinForms works better without this
+            //UIHelper.CenterFormByParent((Form)dialog, mainHandle);
 
-            return base.ShowModalX(dialog, owner, keepModeless);
+            wfModal.ShowDialog(owner as IWin32Window);
+            return await wfModal.DialogResultTask;
         }
 
         public override void EnableWindow(IWidgetForm form, bool value)
@@ -182,7 +191,7 @@ namespace GKUI.Platform
                 try {
                     workerThread.Start(progressForm);
 
-                    progressForm.ShowModalX(activeWnd);
+                    ((Form)progressForm).ShowDialog(activeWnd as IWin32Window);
                 } catch (Exception ex) {
                     Logger.WriteError("ExecuteWork()", ex);
                 }
@@ -245,6 +254,14 @@ namespace GKUI.Platform
             return UIHelper.Rt2Rt(screen.WorkingArea);
         }
 
+        public override void SetWindowBounds(IWindow window, ExtRect bounds)
+        {
+            var form = window as Form;
+            if (form == null) return;
+
+            form.Bounds = UIHelper.Rt2Rt(bounds);
+        }
+
         public override void WidgetLocate(IWidgetForm view, WidgetLocation location)
         {
             var form = view as Form;
@@ -282,7 +299,7 @@ namespace GKUI.Platform
 
                 case Feature.RecentFilesLoad:
                     // In the SDI interface, it is not clear how to implement it correctly
-                    result = false;
+                    result = true;
                     break;
 
                 case Feature.Themes:
@@ -460,8 +477,11 @@ namespace GKUI.Platform
             container.Register<ILanguageEditDlg, LanguageEditDlg>(LifeCycle.Transient);
             container.Register<ILanguageSelectDlg, LanguageSelectDlg>(LifeCycle.Transient);
             container.Register<ILocationEditDlg, LocationEditDlg>(LifeCycle.Transient);
+            container.Register<ILocationNameEditDlg, LocationNameEditDlg>(LifeCycle.Transient);
+            container.Register<ILocationLinkEditDlg, LocationLinkEditDlg>(LifeCycle.Transient);
             container.Register<IMapsViewerWin, MapsViewerWin>(LifeCycle.Transient);
             container.Register<IMediaEditDlg, MediaEditDlg>(LifeCycle.Transient);
+            container.Register<IMediaViewerWin, MediaViewerWin>(LifeCycle.Transient);
             container.Register<INameEditDlg, NameEditDlg>(LifeCycle.Transient);
             container.Register<INoteEditDlg, NoteEditDlg>(LifeCycle.Transient);
             container.Register<INoteEditDlgEx, NoteEditDlgEx>(LifeCycle.Transient);
@@ -496,6 +516,11 @@ namespace GKUI.Platform
             container.Register<IUserRefEditDlg, UserRefEditDlg>(LifeCycle.Transient);
             container.Register<IRecordInfoDlg, RecordInfoDlg>(LifeCycle.Transient);
             container.Register<IFARDlg, FindAndReplaceDlg>(LifeCycle.Transient);
+            container.Register<IEventDefEditDlg, EventDefEditDlg>(LifeCycle.Transient);
+            container.Register<ILocExpertDlg, LocExpertDlg>(LifeCycle.Transient);
+            container.Register<IPartialView, PartialView>(LifeCycle.Transient);
+            container.Register<ISourceCallNumberEditDlg, SourceCallNumberEditDlg>(LifeCycle.Transient);
+            container.Register<IRepositoryCitEditDlg, RepositoryCitEditDlg>(LifeCycle.Transient);
 
             container.Register<IProgressDialog, ProgressDlg>(LifeCycle.Transient);
 
@@ -516,6 +541,7 @@ namespace GKUI.Platform
             ControlsManager.RegisterHandlerType(typeof(TabPage), typeof(TabPageHandler));
             ControlsManager.RegisterHandlerType(typeof(GroupBox), typeof(GroupBoxHandler));
             ControlsManager.RegisterHandlerType(typeof(ToolStripButton), typeof(ButtonToolItemHandler));
+            ControlsManager.RegisterHandlerType(typeof(ToolStripLabel), typeof(LabelToolItemHandler));
             ControlsManager.RegisterHandlerType(typeof(ToolStripDropDownButton), typeof(DropDownToolItemHandler));
             ControlsManager.RegisterHandlerType(typeof(Splitter), typeof(SplitterHandler));
 

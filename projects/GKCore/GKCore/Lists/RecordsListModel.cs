@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,7 +19,6 @@
  */
 
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using GDModel;
 using GKCore.Interfaces;
 using GKCore.Search;
@@ -47,7 +46,7 @@ namespace GKCore.Lists
             set { fSimpleList = value; }
         }
 
-        protected RecordsListModel(IBaseContext baseContext, ListColumns<T> defaultListColumns, GDMRecordType recordType) :
+        protected RecordsListModel(IBaseContext baseContext, ListColumns defaultListColumns, GDMRecordType recordType) :
             base(baseContext, defaultListColumns)
         {
             fRecordType = recordType;
@@ -55,11 +54,12 @@ namespace GKCore.Lists
 
         public override void UpdateContents()
         {
-            int contentSize = fBaseContext.Tree.RecordsCount;
+            var tree = fBaseContext.Tree;
+            int contentSize = tree.RecordsCount;
             InitContent(contentSize);
 
             for (int i = 0; i < contentSize; i++) {
-                GDMRecord rec = fBaseContext.Tree[i];
+                GDMRecord rec = tree[i];
                 if (rec.RecordType == fRecordType) {
                     var tRec = (T)rec;
                     AddFilteredContent(tRec);
@@ -85,14 +85,16 @@ namespace GKCore.Lists
         {
             List<ISearchResult> result = new List<ISearchResult>();
 
-            Regex regex = GKUtils.InitMaskRegex(searchPattern);
+            if (string.IsNullOrEmpty(searchPattern))
+                return result;
 
-            int num = ContentList.Count;
-            for (int i = 0; i < num; i++) {
+            searchPattern = GKUtils.PrepareQSF(searchPattern);
+
+            for (int i = 0, num = ContentList.Count; i < num; i++) {
                 GDMRecord rec = (GDMRecord)ContentList[i].Record;
 
                 string recName = GKUtils.GetRecordName(fBaseContext.Tree, rec, false);
-                if (GKUtils.MatchesRegex(recName, regex)) {
+                if (IsMatchesMask(recName, searchPattern)) {
                     result.Add(new SearchResult(rec));
                 }
             }

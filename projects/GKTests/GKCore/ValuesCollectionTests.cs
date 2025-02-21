@@ -32,10 +32,10 @@ namespace GKCore
 
             valsCol.Add("red", "rojo");
             valsCol.Add("green", "verde");
-            valsCol.Add("blue", "azul", true);
+            valsCol.Add("blue", "azul");
             valsCol.Add("red", "rouge");
             valsCol.Add("red", null);
-            valsCol.Add("red", "rouge", true);
+            valsCol.Add("red", "rouge");
 
             Assert.AreEqual(3, valsCol.Count);
 
@@ -43,7 +43,7 @@ namespace GKCore
             Assert.AreEqual(2, valsCol.Count);
 
             string[] values = valsCol.GetValues("xxxxx");
-            Assert.AreEqual(null, values);
+            Assert.AreEqual(0, values.Length);
 
             values = valsCol.GetValues("red");
             Assert.AreEqual("rojo", values[0]);

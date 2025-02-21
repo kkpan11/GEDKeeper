@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -181,13 +181,13 @@ namespace GDModel
         public UDN GetUDN(string eventSign)
         {
             GDMCustomEvent evt = FindEvent(eventSign);
-            return (evt == null) ? UDN.CreateUnknown() : evt.Date.GetUDN();
+            return (evt == null) ? UDN.Unknown : evt.Date.GetUDN();
         }
 
         public UDN GetUDN(GEDCOMTagType eventType)
         {
             GDMCustomEvent evt = FindEvent(eventType);
-            return (evt == null) ? UDN.CreateUnknown() : evt.Date.GetUDN();
+            return (evt == null) ? UDN.Unknown : evt.Date.GetUDN();
         }
 
         /// <summary>
@@ -201,6 +201,14 @@ namespace GDModel
         {
             GDMCustomEvent evt = FindEvent(eventSign);
             return (evt == null) ? 0 : evt.GetChronologicalYear();
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            ProcessHashes(ref hashCode, fEvents);
+            hashCode.Add(fRestriction);
         }
     }
 }

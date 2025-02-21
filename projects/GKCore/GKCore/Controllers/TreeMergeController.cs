@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -23,6 +23,7 @@ using GKCore.Design;
 using GKCore.Design.Views;
 using GKCore.Tools;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -39,28 +40,35 @@ namespace GKCore.Controllers
         {
         }
 
-        public void Merge()
+        public async void Merge()
         {
-            string fileName = AppHost.StdDialogs.GetOpenFile("", "", LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT);
+            string fileName = await AppHost.StdDialogs.GetOpenFile("", "", LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT);
             if (string.IsNullOrEmpty(fileName)) return;
 
             fView.UpdateBase.Text = fileName;
             TreeTools.MergeTreeFile(fBase.Context.Tree, fileName, fView.SyncLog, true);
-            fBase.Context.Modified = true;
+            fBase.Context.SetModified();
             fBase.RefreshLists(false);
         }
 
         public override void SetLocale()
         {
-            fView.Title = LangMan.LS(LSID.ToolOp_2);
+            fView.Title = LangMan.LS(LSID.TreeMerge);
             if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
-                GetControl<ITabPage>("pageTreeMerge").Text = LangMan.LS(LSID.ToolOp_2);
+                GetControl<ITabPage>("pageTreeMerge").Text = LangMan.LS(LSID.TreeMerge);
                 GetControl<IButton>("btnClose").Text = LangMan.LS(LSID.DlgClose);
             }
             GetControl<IButton>("btnTreeMerge").Text = LangMan.LS(LSID.DlgSelect) + @"...";
             GetControl<ILabel>("lblMasterBase").Text = LangMan.LS(LSID.MasterBase);
             GetControl<ILabel>("lblOtherBase").Text = LangMan.LS(LSID.OtherBase);
             GetControl<ITextBox>("edMasterBase").Text = LangMan.LS(LSID.CurrentBase);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnClose").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -30,6 +30,7 @@ using GKCore.Names;
 using GKCore.Operations;
 using GKCore.Options;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -77,16 +78,23 @@ namespace GKCore.Controllers
             for (GDMSex sx = GDMSex.svUnknown; sx <= GDMSex.svLast; sx++) {
                 string name = GKUtils.SexStr(sx);
                 string resImage = GKData.SexData[(int)sx].SymImage;
-                IImage image = AppHost.GfxProvider.LoadResourceImage(resImage, true);
+                IImage image = AppHost.GfxProvider.LoadResourceImage(resImage, ImageTarget.UI, true);
                 fView.SexCombo.AddItem(name, sx, image);
             }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) {
+            }
+            base.Dispose(disposing);
         }
 
         public override void Init(IBaseWindow baseWin)
         {
             base.Init(baseWin);
 
-            fView.EventsList.ListModel = new EventsListModel(fView, baseWin, fLocalUndoman, true);
+            fView.EventsList.ListModel = new EventsListModel(fView, baseWin, fLocalUndoman);
             fView.NotesList.ListModel = new NoteLinksListModel(fView, baseWin, fLocalUndoman);
             fView.MediaList.ListModel = new MediaLinksListModel(fView, baseWin, fLocalUndoman);
             fView.SourcesList.ListModel = new SourceCitationsListModel(fView, baseWin, fLocalUndoman);
@@ -98,12 +106,24 @@ namespace GKCore.Controllers
             fView.ParentsList.ListModel = new IndiParentsListModel(fView, baseWin, fLocalUndoman);
         }
 
+        public override void Done()
+        {
+            fView.EventsList.ListModel.SaveSettings();
+            fView.NotesList.ListModel.SaveSettings();
+            fView.MediaList.ListModel.SaveSettings();
+            fView.SourcesList.ListModel.SaveSettings();
+            fView.AssociationsList.ListModel.SaveSettings();
+            fView.GroupsList.ListModel.SaveSettings();
+            fView.NamesList.ListModel.SaveSettings();
+            fView.SpousesList.ListModel.SaveSettings();
+            fView.UserRefList.ListModel.SaveSettings();
+            fView.ParentsList.ListModel.SaveSettings();
+        }
+
         private bool IsExtendedWomanSurname()
         {
             var selectedSex = fView.SexCombo.GetSelectedTag<GDMSex>();
-            bool result = (GlobalOptions.Instance.WomanSurnameFormat != WomanSurnameFormat.wsfNotExtend) &&
-                (selectedSex == GDMSex.svFemale);
-            return result;
+            return GlobalOptions.Instance.CanExtendedSurname(selectedSex);
         }
 
         public void ChangeSex()
@@ -291,7 +311,7 @@ namespace GKCore.Controllers
                 fView.MarriedSurname.Text = "";
             }
 
-            var locked = (fView.RestrictionCombo.SelectedIndex == (int) GDMRestriction.rnLocked);
+            var locked = (fView.RestrictionCombo.SelectedIndex == (int)GDMRestriction.rnLocked);
             fView.Patronymic.Enabled = !locked && culture.HasPatronymic;
             fView.Surname.Enabled = !locked && culture.HasSurname;
         }
@@ -307,7 +327,16 @@ namespace GKCore.Controllers
                 // using avatar's image
                 GDMSex curSex = (GDMSex)fView.SexCombo.SelectedIndex;
                 string resImage = GKData.SexData[(int)curSex].DefPortraitImage;
-                img = AppHost.GfxProvider.LoadResourceImage(resImage, false);
+
+                // HACK: on GKvX portrait's control on base ImageBox (SkiaSharp)
+                ImageTarget target;
+                if (AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
+                    target = ImageTarget.Chart;
+                } else {
+                    target = ImageTarget.UI;
+                }
+
+                img = AppHost.GfxProvider.LoadResourceImage(resImage, target, false);
             }
             fView.SetPortrait(img);
 
@@ -385,9 +414,9 @@ namespace GKCore.Controllers
             }
         }
 
-        public void AddPortrait()
+        public async void AddPortrait()
         {
-            if (BaseController.AddIndividualPortrait(fView, fBase, fLocalUndoman, fIndividualRecord)) {
+            if (await BaseController.AddIndividualPortrait(fView, fBase, fLocalUndoman, fIndividualRecord)) {
                 fView.MediaList.UpdateSheet();
                 UpdatePortrait(true);
             }
@@ -400,32 +429,41 @@ namespace GKCore.Controllers
             }
         }
 
-        public void AddParents()
+        public async void AddParents()
         {
             AcceptTempData();
 
-            GDMFamilyRecord family = fBase.Context.SelectFamily(fView, fIndividualRecord);
-            if (family != null && family.IndexOfChild(fIndividualRecord) < 0) {
+            GDMFamilyRecord family = await fBase.Context.SelectFamily(fView, fIndividualRecord);
+            if (family != null) {
+                if (family.HasMember(fIndividualRecord)) {
+                    AppHost.StdDialogs.ShowAlert(LangMan.LS(LSID.InvalidLink));
+                    return;
+                }
+
                 fLocalUndoman.DoOrdinaryOperation(OperationType.otIndividualParentsAttach, fIndividualRecord, family);
             }
             UpdateControls();
         }
 
-        public void EditParents()
+        public async void EditParents()
         {
             AcceptTempData();
 
-            GDMFamilyRecord family = fBase.Context.GetChildFamily(fIndividualRecord, false, null);
-            if (family != null && BaseController.ModifyFamily(fView, fBase, ref family, TargetMode.tmNone, null)) {
-                UpdateControls();
+            GDMFamilyRecord family = await fBase.Context.GetChildFamily(fIndividualRecord, false, null);
+            if (family != null) {
+                var famRes = await BaseController.ModifyFamily(fView, fBase, family, TargetMode.tmNone, null);
+                if (famRes.Result) {
+                    UpdateControls();
+                }
             }
         }
 
-        public void DeleteParents()
+        public async void DeleteParents()
         {
-            if (!AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachParentsQuery))) return;
+            var res = await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachParentsQuery));
+            if (!res) return;
 
-            GDMFamilyRecord family = fBase.Context.GetChildFamily(fIndividualRecord, false, null);
+            GDMFamilyRecord family = await fBase.Context.GetChildFamily(fIndividualRecord, false, null);
             if (family == null) return;
 
             AcceptTempData();
@@ -434,53 +472,53 @@ namespace GKCore.Controllers
             UpdateControls();
         }
 
-        public void AddFather()
+        public async void AddFather()
         {
             AcceptTempData();
 
-            if (BaseController.AddIndividualFather(fView, fBase, fLocalUndoman, fIndividualRecord)) {
+            if (await BaseController.AddIndividualFather(fView, fBase, fLocalUndoman, fIndividualRecord)) {
                 UpdateControls();
             }
         }
 
-        public void DeleteFather()
+        public async void DeleteFather()
         {
             AcceptTempData();
 
-            if (BaseController.DeleteIndividualFather(fBase, fLocalUndoman, fIndividualRecord)) {
+            if (await BaseController.DeleteIndividualFather(fBase, fLocalUndoman, fIndividualRecord)) {
                 UpdateControls();
             }
         }
 
-        public void AddMother()
+        public async void AddMother()
         {
             AcceptTempData();
 
-            if (BaseController.AddIndividualMother(fView, fBase, fLocalUndoman, fIndividualRecord)) {
+            if (await BaseController.AddIndividualMother(fView, fBase, fLocalUndoman, fIndividualRecord)) {
                 UpdateControls();
             }
         }
 
-        public void DeleteMother()
+        public async void DeleteMother()
         {
             AcceptTempData();
 
-            if (BaseController.DeleteIndividualMother(fBase, fLocalUndoman, fIndividualRecord)) {
+            if (await BaseController.DeleteIndividualMother(fBase, fLocalUndoman, fIndividualRecord)) {
                 UpdateControls();
             }
         }
 
-        public void JumpToFather()
+        public async void JumpToFather()
         {
-            GDMFamilyRecord family = fBase.Context.GetChildFamily(fIndividualRecord, false, null);
+            GDMFamilyRecord family = await fBase.Context.GetChildFamily(fIndividualRecord, false, null);
             if (family == null) return;
 
             JumpToRecord(family.Husband);
         }
 
-        public void JumpToMother()
+        public async void JumpToMother()
         {
-            GDMFamilyRecord family = fBase.Context.GetChildFamily(fIndividualRecord, false, null);
+            GDMFamilyRecord family = await fBase.Context.GetChildFamily(fIndividualRecord, false, null);
             if (family == null) return;
 
             JumpToRecord(family.Wife);
@@ -514,7 +552,7 @@ namespace GKCore.Controllers
             GetControl<IButton>("btnCancel").Text = LangMan.LS(LSID.DlgCancel);
             GetControl<ILabel>("lblSurname").Text = LangMan.LS(LSID.Surname);
             GetControl<ILabel>("lblMarriedSurname").Text = LangMan.LS(LSID.MarriedSurname);
-            GetControl<ILabel>("lblName").Text = LangMan.LS(LSID.Name);
+            GetControl<ILabel>("lblName").Text = LangMan.LS(LSID.GivenName);
             GetControl<ILabel>("lblPatronymic").Text = LangMan.LS(LSID.Patronymic);
             GetControl<ILabel>("lblSex").Text = LangMan.LS(LSID.Sex);
             GetControl<ILabel>("lblNickname").Text = LangMan.LS(LSID.Nickname);
@@ -545,6 +583,42 @@ namespace GKCore.Controllers
             SetToolTip("btnMotherDelete", LangMan.LS(LSID.MotherDeleteTip));
             SetToolTip("btnMotherSel", LangMan.LS(LSID.MotherSelTip));
             SetToolTip("btnNameCopy", LangMan.LS(LSID.NameCopyTip));
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            GetControl<IButton>("btnPortraitAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnPortraitDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
+
+            GetControl<IButton>("btnParentsAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnParentsEdit").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_ItemEdit, true);
+            GetControl<IButton>("btnParentsDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
+
+            GetControl<IButton>("btnFatherAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnFatherDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
+            GetControl<IButton>("btnFatherSel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_LinkJump, true);
+
+            GetControl<IButton>("btnMotherAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnMotherDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
+            GetControl<IButton>("btnMotherSel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_LinkJump, true);
+
+            GetControl<IButton>("btnNameCopy").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Copy, true);
+
+            fView.EventsList.ApplyTheme();
+            fView.NotesList.ApplyTheme();
+            fView.MediaList.ApplyTheme();
+            fView.SourcesList.ApplyTheme();
+            fView.AssociationsList.ApplyTheme();
+            fView.GroupsList.ApplyTheme();
+            fView.NamesList.ApplyTheme();
+            fView.SpousesList.ApplyTheme();
+            fView.UserRefList.ApplyTheme();
+            fView.ParentsList.ApplyTheme();
         }
     }
 }

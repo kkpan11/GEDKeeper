@@ -1,3 +1,4 @@
+@echo off
 
 del .\bin\* /s /q
 for /d %%p in (.\bin\*) do rd "%%p" /s /q
@@ -61,6 +62,9 @@ rmdir .\projects\GKMap\GKMap.WinForms\obj /s /q
 rmdir .\projects\GKMap\GKMap.EtoForms\bin /s /q
 rmdir .\projects\GKMap\GKMap.EtoForms\obj /s /q
 
+rmdir .\projects\GKMap\GKMap.Xamarin\bin /s /q
+rmdir .\projects\GKMap\GKMap.Xamarin\obj /s /q
+
 rem <<< GKv3 >>>
 
 rmdir .\projects\GKv3\.vs /s /q
@@ -71,6 +75,20 @@ rmdir .\projects\GKv3\GEDKeeper3\obj /s /q
 
 rmdir .\projects\GKv3\GKComponents\bin /s /q
 rmdir .\projects\GKv3\GKComponents\obj /s /q
+
+rem <<< GKvX >>>
+
+rmdir .\projects\GKvX\.vs /s /q
+
+rmdir .\projects\GKvX\GEDKeeperX\bin /s /q
+rmdir .\projects\GKvX\GEDKeeperX\obj /s /q
+
+rmdir .\projects\GKvX\GEDKeeperX.Android\bin /s /q
+rmdir .\projects\GKvX\GEDKeeperX.Android\obj /s /q
+del .\projects\GKvX\GEDKeeperX.Android\*.csproj.user /s /q
+
+rmdir .\projects\GKvX\GEDKeeperX.iOS\bin /s /q
+rmdir .\projects\GKvX\GEDKeeperX.iOS\obj /s /q
 
 rem <<< Plugins cleaning >>>
 

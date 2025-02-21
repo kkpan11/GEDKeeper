@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -35,6 +35,8 @@ namespace GKUI.Forms
     {
         private readonly GKMapBrowser fMapBrowser;
         private readonly GKSheetList fMediaList;
+        private readonly GKSheetList fNamesList;
+        private readonly GKSheetList fLinksList;
         private readonly GKSheetList fNotesList;
 
         public GDMLocationRecord LocationRecord
@@ -48,6 +50,16 @@ namespace GKUI.Forms
         IMapBrowser ILocationEditDlg.MapBrowser
         {
             get { return fMapBrowser; }
+        }
+
+        ISheetList ILocationEditDlg.NamesList
+        {
+            get { return fNamesList; }
+        }
+
+        ISheetList ILocationEditDlg.LinksList
+        {
+            get { return fLinksList; }
         }
 
         ISheetList ILocationEditDlg.MediaList
@@ -86,6 +98,8 @@ namespace GKUI.Forms
         {
             InitializeComponent();
 
+            tabsData.SelectedIndexChanged += tabsData_SelectedIndexChanged;
+
             btnAccept.Image = UIHelper.LoadResourceImage("Resources.btn_accept.gif");
             btnCancel.Image = UIHelper.LoadResourceImage("Resources.btn_cancel.gif");
 
@@ -94,11 +108,23 @@ namespace GKUI.Forms
             fMapBrowser.Dock = DockStyle.Fill;
             panMap.Controls.Add(fMapBrowser);
 
+            fNamesList = new GKSheetList(pageHistNames);
+            fLinksList = new GKSheetList(pageHistLinks);
+
             fNotesList = new GKSheetList(pageNotes);
             fMediaList = new GKSheetList(pageMultimedia);
 
             fController = new LocationEditDlgController(this);
             fController.Init(baseWin);
+        }
+
+        private void tabsData_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var tabCtl = (TabControl)sender;
+            var selectedTab = tabCtl.SelectedIndex;
+            if (selectedTab == 1) {
+                fController.CheckPrimaryName();
+            }
         }
 
         private void EditName_KeyDown(object sender, KeyEventArgs e)
@@ -121,6 +147,11 @@ namespace GKUI.Forms
         private void btnSelectName_Click(object sender, EventArgs e)
         {
             fController.SelectName();
+        }
+
+        private void btnSelectCursor_Click(object sender, EventArgs e)
+        {
+            fController.SelectCursorCoords();
         }
 
         private void ListGeoCoords_Click(object sender, EventArgs e)

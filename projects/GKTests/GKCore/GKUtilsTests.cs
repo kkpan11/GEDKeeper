@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -23,6 +23,7 @@ using System.IO;
 using BSLib;
 using GDModel;
 using GDModel.Providers.GEDCOM;
+using GKCore.Interfaces;
 using GKCore.Options;
 using GKCore.Types;
 using GKTests;
@@ -33,7 +34,7 @@ namespace GKCore
     [TestFixture]
     public class GKUtilsTests
     {
-        private BaseContext fContext;
+        private readonly BaseContext fContext;
 
         public GKUtilsTests()
         {
@@ -53,13 +54,6 @@ namespace GKCore
             Assert.IsTrue(Directory.Exists(appPath));
 
             Assert.AreEqual(appPath + "plugins" + Path.DirectorySeparatorChar, GKUtils.GetPluginsPath());
-        }
-
-        [Test]
-        public void Test_GetXIndex()
-        {
-            Assert.AreEqual(1, GKUtils.GetPersonEventIndex(GEDCOMTagName.BIRT));
-            Assert.AreEqual(2, GKUtils.GetFamilyEventIndex(GEDCOMTagName.MARR));
         }
 
         [Test]
@@ -153,6 +147,8 @@ namespace GKCore
             Assert.AreEqual("Ivanovo", GKUtils.GetPlaceStr(evt, false, false));
             Assert.AreEqual("Ivanovo", GKUtils.GetPlaceStr(evt, false, true));
 
+            GlobalOptions.Instance.ReversePlaceEntitiesOrder = true;
+
             evt.Place.StringValue = "Ivanovo, Ivanovo obl., Russia";
             Assert.AreEqual("Ivanovo, Ivanovo obl., Russia", GKUtils.GetPlaceStr(evt, false, false));
             Assert.AreEqual("Ivanovo", GKUtils.GetPlaceStr(evt, false, true));
@@ -165,7 +161,7 @@ namespace GKCore
             Assert.AreEqual(", Ivanovo obl., Russia", GKUtils.GetPlaceStr(evt, false, false));
             Assert.AreEqual("", GKUtils.GetPlaceStr(evt, false, true));
 
-            GlobalOptions.Instance.ReversePlaceEntitiesOrder = true;
+            GlobalOptions.Instance.ReversePlaceEntitiesOrder = false;
 
             evt.Place.StringValue = "Russia, Ivanovo obl., Ivanovo";
             Assert.AreEqual("Russia, Ivanovo obl., Ivanovo", GKUtils.GetPlaceStr(evt, false, false));
@@ -180,6 +176,9 @@ namespace GKCore
             Assert.Throws(typeof(ArgumentNullException), () => { GKUtils.SetNameParts(null, surname, name, patronymic); });
             Assert.Throws(typeof(ArgumentNullException), () => { GKUtils.GetNameParts(null, null); });
             Assert.Throws(typeof(ArgumentNullException), () => { GKUtils.GetNameParts(null, null, true); });
+
+            var personalName = new GDMPersonalName();
+            Assert.DoesNotThrow(() => { GKUtils.SetNameParts(personalName, null, null, null); });
         }
 
         [Test]
@@ -292,7 +291,32 @@ namespace GKCore
         [Test]
         public void Test_GetDaysForBirth()
         {
-            Assert.AreEqual(-1, GKUtils.GetDaysForBirth(null));
+            GDMDate gdmDate = new GDMDate();
+            gdmDate.ParseString("20 DEC 1980");
+
+            int years;
+            bool anniversary;
+
+            Assert.AreEqual(-1, GKUtils.GetDaysForBirth(null, true, out years, out anniversary));
+
+            Assert.AreEqual(-1, GKUtils.GetDaysFor(gdmDate, DateTime.Parse("1982-12-25T00:00:00"), out years, out anniversary)); // curdate ahead
+
+            Assert.AreEqual(0, GKUtils.GetDaysFor(gdmDate, DateTime.Parse("1981-12-20T00:00:00"), out years, out anniversary)); // dates are equal, and 1 year
+            Assert.AreEqual(1, years);
+            Assert.AreEqual(false, anniversary);
+
+            Assert.AreEqual(2, GKUtils.GetDaysFor(gdmDate, DateTime.Parse("1981-12-18T00:00:00"), out years, out anniversary)); // 2 days left, and year *will be* 1
+            Assert.AreEqual(1, years);
+            Assert.AreEqual(false, anniversary);
+
+            Assert.AreEqual(1, GKUtils.GetDaysFor(gdmDate, DateTime.Parse("1990-12-19T00:00:00"), out years, out anniversary)); // 1 days left, and year *will be* 10
+            Assert.AreEqual(10, years);
+            Assert.AreEqual(true, anniversary);
+
+            gdmDate.ParseString("22 DEC 1990");
+            Assert.AreEqual(1, GKUtils.GetDaysFor(gdmDate, DateTime.Parse("2024-12-21T21:00:00"), out years, out anniversary)); // 1 days left
+            Assert.AreEqual(34, years);
+            Assert.AreEqual(false, anniversary);
         }
 
         [Test]
@@ -391,6 +415,12 @@ namespace GKCore
         public void Test_GetEventName()
         {
             Assert.Throws(typeof(ArgumentNullException), () => { GKUtils.GetEventName(null); });
+        }
+
+        [Test]
+        public void Test_GetEventNameLd()
+        {
+            Assert.Throws(typeof(ArgumentNullException), () => { GKUtils.GetEventNameLd(null); });
         }
 
         [Test]
@@ -502,10 +532,10 @@ namespace GKCore
         [Test]
         public void Test_HyperLink()
         {
-            string st1 = GKUtils.HyperLink("@X001@", "test", 0);
+            string st1 = GKUtils.HyperLink("@X001@", "test");
             Assert.AreEqual("[url=" + "@X001@" + "]" + "test" + "[/url]", st1);
 
-            st1 = GKUtils.HyperLink("@X001@", "", 0);
+            st1 = GKUtils.HyperLink("@X001@", "");
             Assert.AreEqual("[url=" + "@X001@" + "]" + "???" + "[/url]", st1);
         }
 
@@ -574,9 +604,9 @@ namespace GKCore
             GKUtils.ShowPersonInfo(fContext, indRec, summary);
 
             summary.Clear();
-            GKUtils.ShowSourceInfo(null, null, null);
+            GKUtils.ShowSourceInfo(null, null, null, RecordContentType.Quick);
             GDMSourceRecord srcRec = fContext.Tree.XRefIndex_Find("S1") as GDMSourceRecord;
-            GKUtils.ShowSourceInfo(fContext, srcRec, summary);
+            GKUtils.ShowSourceInfo(fContext, srcRec, summary, RecordContentType.Quick);
 
             summary.Clear();
             GKUtils.ShowRepositoryInfo(null, null, null);
@@ -633,7 +663,7 @@ namespace GKCore
         [Test]
         public void Test_GetNormalizeDate()
         {
-            Assert.AreEqual("", GKUtils.GetNormalizeDate("", "mm/dd/yyyy"));
+            Assert.AreEqual("", GKUtils.GetNormalizeDate("..", "mm/dd/yyyy"));
             Assert.AreEqual("30.01.1980", GKUtils.GetNormalizeDate("01/30/1980", "mm/dd/yyyy"));
             Assert.AreEqual("30.01.1980", GKUtils.GetNormalizeDate("1980/01/30", "yyyy/mm/dd"));
         }
@@ -649,7 +679,7 @@ namespace GKCore
         [Test]
         public void Test_GetRecordContent()
         {
-            GKUtils.GetRecordContent(null, null, null);
+            GKUtils.GetRecordContent(null, null, null, RecordContentType.Quick);
         }
 
         [Test]
@@ -672,6 +702,10 @@ namespace GKCore
             Assert.AreEqual(0, GKUtils.GetDifferenceInYears(DateTime.Parse("2011-12-14T00:00:00"), DateTime.Parse("2012-12-13T00:00:00"))); // 0.91
 
             Assert.AreEqual(19, GKUtils.GetDifferenceInYears(DateTime.Parse("1987-09-23T00:00:00"), DateTime.Parse("2007-06-15T00:00:00"))); // 3 monthes to 20
+
+            Assert.AreEqual(45, GKUtils.GetDifferenceInYears(DateTime.Parse("1979-01-20T00:00:00"), DateTime.Parse("2024-05-05T00:00:00"))); // 45
+
+            Assert.AreEqual(37, GKUtils.GetDifferenceInYears(DateTime.Parse("1957-03-05T00:00:00"), DateTime.Parse("1995-02-15T00:00:00"))); // 37
         }
     }
 }

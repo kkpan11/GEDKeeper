@@ -8,10 +8,15 @@
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 
-        <Configurations>MSWin_Debug;MSWin_Release;Linux_Debug;Linux_Release;MacOS_Debug;MacOS_Release;FreeBSD_Debug;FreeBSD_Release</Configurations>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>MSWin64;Linux;MacOS;FreeBSD</Platforms>
     </PropertyGroup>
 
     <Import Project="..\..\GKConfigurations3.targets" />
+
+    <ItemGroup>
+      <Compile Include="..\..\GlobalSuppressions.cs" Link="GlobalSuppressions.cs" />
+    </ItemGroup>
 
 
     <ItemGroup>

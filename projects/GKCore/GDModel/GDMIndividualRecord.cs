@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -260,7 +260,7 @@ namespace GDModel
             int num = fSpouseToFamilyLinks.Count;
             for (int i = 0; i < num; i++) {
                 if (fSpouseToFamilyLinks[i].XRef == familyRec.XRef) {
-                    fSpouseToFamilyLinks.DeleteAt(i);
+                    fSpouseToFamilyLinks.RemoveAt(i);
                     break;
                 }
             }
@@ -273,7 +273,7 @@ namespace GDModel
             int num = fChildToFamilyLinks.Count;
             for (int i = 0; i < num; i++) {
                 if (fChildToFamilyLinks[i].XRef == familyRec.XRef) {
-                    fChildToFamilyLinks.DeleteAt(i);
+                    fChildToFamilyLinks.RemoveAt(i);
                     break;
                 }
             }
@@ -390,22 +390,29 @@ namespace GDModel
             fSpouseToFamilyLinks.ReplaceXRefs(map);
         }
 
-        public sealed class LifeDatesRet
+        public sealed class LifeEvents
         {
             public readonly GDMCustomEvent BirthEvent;
             public readonly GDMCustomEvent DeathEvent;
 
-            public LifeDatesRet(GDMCustomEvent birthEvent, GDMCustomEvent deathEvent)
+            public readonly GDMCustomEvent BaptismEvent;
+            public readonly GDMCustomEvent BurialEvent;
+
+            public LifeEvents(GDMCustomEvent birthEvent, GDMCustomEvent deathEvent, GDMCustomEvent baptismEvent, GDMCustomEvent burialEvent)
             {
                 BirthEvent = birthEvent;
                 DeathEvent = deathEvent;
+                BaptismEvent = baptismEvent;
+                BurialEvent = burialEvent;
             }
         }
 
-        public LifeDatesRet GetLifeDates()
+        public LifeEvents GetLifeEvents(bool ext = false)
         {
             GDMCustomEvent birthEvent = null;
             GDMCustomEvent deathEvent = null;
+            GDMCustomEvent baptismEvent = null;
+            GDMCustomEvent burialEvent = null;
 
             int num = Events.Count;
             for (int i = 0; i < num; i++) {
@@ -416,10 +423,16 @@ namespace GDModel
                     birthEvent = evt;
                 } else if (evtType == GEDCOMTagType.DEAT && deathEvent == null) {
                     deathEvent = evt;
+                } else if (ext) {
+                    if (evtType == GEDCOMTagType.BAPM && baptismEvent == null) {
+                        baptismEvent = evt;
+                    } else if (evtType == GEDCOMTagType.BURI && burialEvent == null) {
+                        burialEvent = evt;
+                    }
                 }
             }
 
-            return new LifeDatesRet(birthEvent, deathEvent);
+            return new LifeEvents(birthEvent, deathEvent, baptismEvent, burialEvent);
         }
 
         public GDMPersonalName GetPrimaryPersonalName()
@@ -487,8 +500,8 @@ namespace GDModel
             // 0% name match would be pointless checking other details
             if (nameMatch != 0.0f && matchParams.DatesCheck)
             {
-                var dates = GetLifeDates();
-                var indiDates = indi.GetLifeDates();
+                var dates = GetLifeEvents();
+                var indiDates = indi.GetLifeEvents();
 
                 if (dates.BirthEvent != null && indiDates.BirthEvent != null) {
                     birthMatch = dates.BirthEvent.IsMatch(indiDates.BirthEvent, matchParams);
@@ -564,6 +577,18 @@ namespace GDModel
             }
 
             return result;
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            ProcessHashes(ref hashCode, fAssociations);
+            ProcessHashes(ref hashCode, fChildToFamilyLinks);
+            ProcessHashes(ref hashCode, fGroups);
+            ProcessHashes(ref hashCode, fPersonalNames);
+            ProcessHashes(ref hashCode, fSpouseToFamilyLinks);
+            hashCode.Add(fSex);
         }
     }
 }

@@ -36,6 +36,7 @@
                                         <Button x:Name="btnSearch" Style="{StaticResource funcBtn}" Clicked="btnSearch_Click" />
                                         <Button x:Name="btnSelect" Style="{StaticResource funcBtn}" Clicked="btnSelect_Click" />
                                         <Button x:Name="btnSelectName" Style="{StaticResource funcBtn}" Clicked="btnSelectName_Click" />
+                                        <Button x:Name="btnSelectCursor" Style="{StaticResource funcBtn}" Clicked="btnSelectCursor_Click" />
                                         <Button x:Name="btnShowOnMap" Style="{StaticResource funcBtn}" Clicked="btnShowOnMap_Click" />
                                     </StackLayout>
                                 </StackLayout>
@@ -44,6 +45,17 @@
                             </StackLayout>
                         </comcom:GroupBox>
                     </StackLayout>
+                </xp:TabItem>
+
+                <xp:TabItem x:Name="pageHistory">
+                    <Grid x:Name="tabsHistory" VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand">
+                        <comcom:GroupBox x:Name="pageHistNames" Grid.Column="0" Grid.Row="0">
+                            <comcom:GKSheetList x:Name="fNamesList" VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" />
+                        </comcom:GroupBox>
+                        <comcom:GroupBox x:Name="pageHistLinks" Grid.Column="0" Grid.Row="1">
+                            <comcom:GKSheetList x:Name="fLinksList" VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" />
+                        </comcom:GroupBox>
+                    </Grid>
                 </xp:TabItem>
 
                 <xp:TabItem x:Name="pageNotes">

@@ -3,8 +3,16 @@
 
     <ItemGroup>
         <Compile Include="NavigatorData.cs" />
+        <Compile Include="HistoryData.cs" />
+        <Compile Include="WebLinksView.cs" />
 
+        <None Include="GKNavigatorPlugin.afr">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKNavigatorPlugin.cze">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKNavigatorPlugin.deu">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Include="GKNavigatorPlugin.dut">
@@ -13,10 +21,28 @@
         <None Include="GKNavigatorPlugin.enu">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Include="GKNavigatorPlugin.fra">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKNavigatorPlugin.hun">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKNavigatorPlugin.jpn">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKNavigatorPlugin.pol">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKNavigatorPlugin.rus">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Include="GKNavigatorPlugin.spa">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKNavigatorPlugin.ukr">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKNavigatorPlugin.zho">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
     </ItemGroup>

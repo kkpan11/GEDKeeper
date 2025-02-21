@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,6 +18,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using System;
 using System.Collections.Generic;
 using GDModel.Providers.GEDCOM;
 
@@ -35,6 +36,28 @@ namespace GDModel
         GDMList<GDMTag> SubTags { get; }
 
         bool IsEmpty();
+
+        int GetHashCode();
+    }
+
+
+    public interface IGDMList<T> : IDisposable, IEnumerable<T>
+        where T : class, IGDMObject
+    {
+        int Count { get; }
+
+        T this[int index] { get; }
+
+
+        T Add(T item);
+
+        void Clear();
+
+        void Remove(T item);
+
+        void RemoveAt(int index);
+
+        int IndexOf(T item);
     }
 
 
@@ -149,6 +172,7 @@ namespace GDModel
         string AutomatedRecordID { get; }
         GDMChangeDate ChangeDate { get; }
         GDMRecordType RecordType { get; }
+        GDMTree Tree { get; }
     }
 
 

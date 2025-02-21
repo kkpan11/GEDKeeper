@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2018-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2018-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -47,7 +47,7 @@ namespace GKStdReports
 
         private Range<int> GetIndividualDates(GDMIndividualRecord iRec)
         {
-            var dates = iRec.GetLifeDates();
+            var dates = iRec.GetLifeEvents();
 
             int yBirth = (dates.BirthEvent == null) ? 0 : dates.BirthEvent.GetChronologicalYear();
             int yDeath = (dates.DeathEvent == null) ? 0 : dates.DeathEvent.GetChronologicalYear();
@@ -89,10 +89,9 @@ namespace GKStdReports
             
             fWriter.BeginList();
 
-            var enumer = fBase.Context.Tree.GetEnumerator(GDMRecordType.rtIndividual);
-            GDMRecord record;
-            while (enumer.MoveNext(out record)) {
-                var iRec = record as GDMIndividualRecord;
+            var enumer = fBase.Context.Tree.GetEnumerator<GDMIndividualRecord>();
+            GDMIndividualRecord iRec;
+            while (enumer.MoveNext(out iRec)) {
                 var indRange = GetIndividualDates(iRec);
                 try {
                     if (personRange.IsOverlapped(indRange)) {

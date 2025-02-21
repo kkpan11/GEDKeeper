@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2021 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -28,7 +28,7 @@ namespace GDModel
     public sealed class GDMMultimediaLink : GDMPointer
     {
         private GDMCutoutPosition fCutoutPosition;
-        private GDMList<GDMFileReference> fFileReferences;
+        private readonly GDMList<GDMFileReference> fFileReferences;
         private bool fIsPrimary;
         private bool fIsPrimaryCutout;
         private string fTitle;
@@ -163,6 +163,17 @@ namespace GDModel
         {
             base.ReplaceXRefs(map);
             fFileReferences.ReplaceXRefs(map);
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fCutoutPosition);
+            ProcessHashes(ref hashCode, fFileReferences);
+            hashCode.Add(fIsPrimary);
+            hashCode.Add(fIsPrimaryCutout);
+            hashCode.Add(fTitle);
         }
     }
 }

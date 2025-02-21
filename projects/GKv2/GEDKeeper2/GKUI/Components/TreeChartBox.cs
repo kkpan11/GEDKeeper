@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -48,15 +48,12 @@ namespace GKUI.Components
         private readonly TweenLibrary fTween;
 
         private ITreeControl fActiveControl;
-        private IContainer fComponents;
-        private long fHighlightedStart;
         private ChartControlMode fMode = ChartControlMode.Default;
         private int fMouseX;
         private int fMouseY;
         private TreeChartOptions fOptions;
         private TreeChartPerson fSelected;
         private GDMIndividualRecord fSaveSelection;
-        private Timer fTimer;
         private bool fTraceKinships;
         private bool fTraceSelected;
 
@@ -131,7 +128,7 @@ namespace GKUI.Components
             }
         }
 
-        public new float Scale
+        public override float Scale
         {
             get { return fModel.Scale; }
         }
@@ -171,7 +168,7 @@ namespace GKUI.Components
 
         public TreeChartBox()
         {
-            fModel = new TreeChartModel();
+            fModel = new TreeChartModel(this);
             fRenderer = null;
             fSelected = null;
             fToolTip = new ToolTip();
@@ -182,7 +179,6 @@ namespace GKUI.Components
             fTreeControls.Add(new TCGenerationsControl(this, TreeChartKind.ckDescendants));
             //fPersonControl = new PersonControl(this);
 
-            InitTimer();
             fTween = new TweenLibrary();
         }
 
@@ -198,7 +194,6 @@ namespace GKUI.Components
                 fModel.Dispose();
 
                 if (fTreeControls != null) fTreeControls.Dispose();
-                if (fComponents != null) fComponents.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -209,33 +204,7 @@ namespace GKUI.Components
             fModel.SetRenderer(renderer);
         }
 
-        private void InitTimer()
-        {
-            fComponents = new Container();
-            fTimer = new Timer(fComponents);
-            fTimer.Interval = 1;
-            fTimer.Tick += TickTimer;
-            fTimer.Stop();
-            fTimer.Enabled = false;
-            fTimer.Enabled = true;
-        }
-
-        private void TickTimer(object sender, EventArgs e)
-        {
-            if (fModel.HighlightedPerson == null) return;
-
-            DateTime st = DateTime.FromBinary(fHighlightedStart);
-            DateTime cur = DateTime.Now;
-            TimeSpan d = cur - st;
-
-            if (d.TotalSeconds >= 1/* && !fPersonControl.Visible*/) {
-                fModel.HighlightedPerson = null;
-                //fPersonControl.Visible = true;
-                Invalidate();
-            }
-        }
-
-        public void SetScale(float value)
+        public override void SetScale(float value)
         {
             fModel.Scale = value;
 
@@ -335,6 +304,17 @@ namespace GKUI.Components
 
         private void DrawBackground(RenderTarget target, BackgroundMode background)
         {
+            int width, height;
+            if (target == RenderTarget.Screen) {
+                var rect = ClientRectangle;
+                width = rect.Width;
+                height = rect.Height;
+            } else {
+                // when rendering goes to a file, the fill should be on the entire area
+                width = fModel.ImageWidth;
+                height = fModel.ImageHeight;
+            }
+
             switch (background) {
                 case BackgroundMode.bmNone:
                     break;
@@ -342,20 +322,10 @@ namespace GKUI.Components
                 case BackgroundMode.bmImage:
                 case BackgroundMode.bmFill:
                 case BackgroundMode.bmAny:
-                    int width, height;
-                    if (target == RenderTarget.Screen) {
-                        var rect = ClientRectangle;
-                        width = rect.Width;
-                        height = rect.Height;
-                    } else {
-                        // when rendering goes to a file, the fill should be on the entire area
-                        width = fModel.ImageWidth;
-                        height = fModel.ImageHeight;
-                    }
                     if (BackgroundImage != null) {
                         // texture filling can be done by the control itself when the property is set,
                         // and when printing, sheet filling is not needed
-                        if (target > RenderTarget.Printer) {
+                        if (target != RenderTarget.Printer) {
                             using (Brush textureBrush = new TextureBrush(BackgroundImage)) {
                                 fRenderer.FillRectangle(new BrushHandler(textureBrush), 0, 0, width, height);
                             }
@@ -369,52 +339,9 @@ namespace GKUI.Components
 
         private void InternalDraw(RenderTarget target, ChartDrawMode drawMode, BackgroundMode background)
         {
-            // drawing relative offset of tree on graphics
-            int spx = 0;
-            int spy = 0;
-
-            Size clientSize = ClientSize;
-            ExtPoint scrollPos = new ExtPoint(Math.Abs(AutoScrollPosition.X), Math.Abs(AutoScrollPosition.Y));
-
-            if (drawMode == ChartDrawMode.dmInteractive) {
-                spx += -scrollPos.X;
-                spy += -scrollPos.Y;
-
-                Rectangle viewPort = GetImageViewPort();
-                fModel.VisibleArea = ExtRect.CreateBounds(scrollPos.X, scrollPos.Y, viewPort.Width, viewPort.Height);
-            } else {
-                fModel.VisibleArea = ExtRect.CreateBounds(0, 0, fModel.ImageWidth, fModel.ImageHeight);
-            }
-
-            if (drawMode == ChartDrawMode.dmInteractive || drawMode == ChartDrawMode.dmStaticCentered) {
-                if (fModel.ImageWidth < clientSize.Width) {
-                    spx += (clientSize.Width - fModel.ImageWidth) / 2;
-                }
-
-                if (fModel.ImageHeight < clientSize.Height) {
-                    spy += (clientSize.Height - fModel.ImageHeight) / 2;
-                }
-            }
-
-            fModel.SetOffsets(spx, spy);
-
-            fRenderer.SetSmoothing(true);
-
+            fModel.PrepareDraw(drawMode);
             DrawBackground(target, background);
-
-            #if DEBUG_IMAGE
-            using (Pen pen = new Pen(Color.Red)) {
-                fRenderer.DrawRectangle(pen, Color.Transparent, fSPX, fSPY, fImageWidth, fImageHeight);
-            }
-            #endif
-
-            fRenderer.SetTranslucent(0.0f);
             fModel.Draw(drawMode);
-
-            if (fOptions.BorderStyle != GfxBorderStyle.None) {
-                var rt = ExtRect.CreateBounds(spx, spy, fModel.ImageWidth, fModel.ImageHeight);
-                BorderPainter.DrawBorder(fRenderer, rt, fOptions.BorderStyle);
-            }
         }
 
         #endregion
@@ -423,7 +350,7 @@ namespace GKUI.Components
 
         public ExtRect GetClientRect()
         {
-            return UIHelper.Rt2Rt(this.ClientRectangle);
+            return UIHelper.Rt2Rt(base.ClientRectangle);
         }
 
         public ExtPoint GetDrawOrigin()
@@ -535,7 +462,7 @@ namespace GKUI.Components
             base.OnKeyDown(e);
         }
 
-        protected override void OnResize(EventArgs e)
+        protected override void OnSizeChanged(EventArgs e)
         {
             SaveSelection();
 
@@ -545,7 +472,7 @@ namespace GKUI.Components
 
             RestoreSelection();
 
-            base.OnResize(e);
+            base.OnSizeChanged(e);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -608,7 +535,7 @@ namespace GKUI.Components
                     }
                 }
 
-                ExtRect expRt = TreeChartModel.GetExpanderRect(persRt);
+                ExtRect expRt = fModel.GetExpanderRect(persRt);
                 if ((e.Button == MouseButtons.Left && mouseEvent == MouseEvent.meUp) && expRt.Contains(aX, aY)) {
                     person = p;
                     result = MouseAction.Expand;
@@ -622,7 +549,7 @@ namespace GKUI.Components
                     break;
                 }
 
-                ExtRect infoRt = TreeChartModel.GetInfoRect(persRt);
+                ExtRect infoRt = fModel.GetInfoRect(persRt);
                 if ((e.Button == MouseButtons.Left && mouseEvent == MouseEvent.meUp) && infoRt.Contains(aX, aY)) {
                     person = p;
                     result = MouseAction.Info;
@@ -728,6 +655,8 @@ namespace GKUI.Components
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
+            Point evtPt = e.Location;
+
             switch (fMode) {
                 case ChartControlMode.Default:
                     TreeChartPerson mPers;
@@ -765,7 +694,7 @@ namespace GKUI.Components
                     break;
 
                 case ChartControlMode.ControlsVisible:
-                    fTreeControls.MouseUp(e.X, e.Y);
+                    fTreeControls.MouseUp(evtPt.X, evtPt.Y);
                     break;
             }
 
@@ -798,7 +727,6 @@ namespace GKUI.Components
             if (fModel.HighlightedPerson == person) return;
 
             fModel.HighlightedPerson = person;
-            fHighlightedStart = DateTime.Now.ToBinary();
 
             /*if (person == null) {
                 //fPersonControl.Visible = false;
@@ -843,15 +771,14 @@ namespace GKUI.Components
         {
             if (person == null || fTween.Busy) return;
 
-            int width = ClientSize.Width;
-            int height = ClientSize.Height;
-            int widthMax = fModel.ImageWidth - width;
-            int heightMax = fModel.ImageHeight - height;
+            var viewport = this.Viewport;
+            int widthMax = fModel.ImageWidth - viewport.Width;
+            int heightMax = fModel.ImageHeight - viewport.Height;
 
-            int srcX = Math.Abs(AutoScrollPosition.X);
-            int srcY = Math.Abs(AutoScrollPosition.Y);
-            int dstX = Algorithms.CheckBounds(((person.PtX) - (width / 2)), 0, widthMax);
-            int dstY = Algorithms.CheckBounds(((person.PtY + (person.Height / 2)) - (height / 2)), 0, heightMax);
+            int srcX = viewport.Left;
+            int srcY = viewport.Top;
+            int dstX = Algorithms.CheckBounds(((person.PtX) - (viewport.Width / 2)), 0, widthMax);
+            int dstY = Algorithms.CheckBounds(((person.PtY + (person.Height / 2)) - (viewport.Height / 2)), 0, heightMax);
 
             if ((srcX != dstX) || (srcY != dstY)) {
                 int timeInterval = animation ? 20 : 1;
@@ -865,7 +792,7 @@ namespace GKUI.Components
 
         public override ExtSize GetImageSize()
         {
-            return fModel.ImageSize;
+            return (fModel != null) ? fModel.ImageSize : ExtSize.Empty;
         }
 
         public override void RenderImage(RenderTarget target, bool forciblyCentered = false)

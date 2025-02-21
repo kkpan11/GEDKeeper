@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -24,8 +24,11 @@ using System;
 using System.IO;
 using System.Text;
 using GKCore.Design;
+using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Options;
+using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -55,11 +58,11 @@ namespace GKCore.Controllers
             fView.Modified = false;
         }
 
-        public void LoadScript()
+        public async void LoadScript()
         {
             if (!fView.CheckModified()) return;
 
-            string fileName = AppHost.StdDialogs.GetOpenFile("", GlobalOptions.Instance.ScriptsLastDir, LangMan.LS(LSID.ScriptsFilter), 1, GKData.LUA_EXT);
+            string fileName = await AppHost.StdDialogs.GetOpenFile("", GlobalOptions.Instance.ScriptsLastDir, LangMan.LS(LSID.ScriptsFilter), 1, GKData.LUA_EXT);
             if (string.IsNullOrEmpty(fileName)) return;
 
             GlobalOptions.Instance.ScriptsLastDir = Path.GetDirectoryName(fileName);
@@ -72,9 +75,9 @@ namespace GKCore.Controllers
             }
         }
 
-        public void SaveScript()
+        public async void SaveScript()
         {
-            string fileName = AppHost.StdDialogs.GetSaveFile("", GlobalOptions.Instance.ScriptsLastDir, LangMan.LS(LSID.ScriptsFilter), 1, GKData.LUA_EXT, fView.FileName);
+            string fileName = await AppHost.StdDialogs.GetSaveFile("", GlobalOptions.Instance.ScriptsLastDir, LangMan.LS(LSID.ScriptsFilter), 1, GKData.LUA_EXT, fView.FileName);
             if (string.IsNullOrEmpty(fileName)) return;
 
             GlobalOptions.Instance.ScriptsLastDir = Path.GetDirectoryName(fileName);
@@ -103,6 +106,16 @@ namespace GKCore.Controllers
             SetToolTip("tbLoadScript", LangMan.LS(LSID.LoadScriptTip));
             SetToolTip("tbSaveScript", LangMan.LS(LSID.SaveScriptTip));
             SetToolTip("tbRun", LangMan.LS(LSID.RunScriptTip));
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IToolItem>("tbNewScript").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileNew, true);
+            GetControl<IToolItem>("tbLoadScript").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileLoad, true);
+            GetControl<IToolItem>("tbSaveScript").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileSave, true);
+            GetControl<IToolItem>("tbRun").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Start, true);
         }
     }
 }

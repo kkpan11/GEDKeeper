@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2017 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -37,7 +37,11 @@ namespace GKCore.Interfaces
 
     public enum ConditionKind : int
     {
-        ck_NotEq, ck_LT, ck_LET, ck_Eq, ck_GET, ck_GT, ck_Contains, ck_NotContains
+        ck_NotEq, ck_LT, ck_LET, ck_Eq, ck_GET, ck_GT,
+        ck_Contains, ck_NotContains,
+        ck_ContainsMask, ck_NotContainsMask,
+
+        ck_Last = ck_NotContainsMask
     }
 
 
@@ -81,12 +85,13 @@ namespace GKCore.Interfaces
         ListColumn this[int index] { get; }
         IList<ListColumn> OrderedColumns { get; }
 
+        void Clear();
         void CopyTo(IListColumns target);
         bool MoveColumn(int idx, bool up);
         void ResetDefaults();
         void UpdateOrders();
 
         void LoadFromFile(IniFile iniFile, string section, int optsVersion);
-        void SaveToFile(IniFile iniFile, string section);
+        void SaveToFile(IniFile iniFile, string section, int optsVersion);
     }
 }

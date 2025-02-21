@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -60,12 +60,12 @@ namespace GDModel
 
         protected override string GetStringValue()
         {
-            return ((fValue == null) ? "" : fValue.StringValue);
+            return (fValue == null) ? "" : fValue.StringValue;
         }
 
         public override DateTime GetDateTime()
         {
-            DateTime result = ((fValue == null) ? new DateTime(0) : fValue.GetDateTime());
+            DateTime result = (fValue == null) ? new DateTime(0) : fValue.GetDateTime();
             return result;
         }
 
@@ -144,7 +144,7 @@ namespace GDModel
 
         public override UDN GetUDN()
         {
-            return (fValue == null) ? UDN.CreateUnknown() : fValue.GetUDN();
+            return (fValue == null) ? UDN.Unknown : fValue.GetUDN();
         }
 
         /// <summary>
@@ -163,6 +163,28 @@ namespace GDModel
         {
             string result = (fValue == null) ? string.Empty : fValue.GetDisplayStringExt(format, sign, showCalendar, shorten);
             return result;
+        }
+
+        public override string ToString()
+        {
+            return GetDisplayStringExt(DateFormat.dfDD_MM_YYYY, true, true, false);
+        }
+
+        public override void GetDateRange(out GDMDate dateStart, out GDMDate dateEnd)
+        {
+            if (fValue == null) {
+                dateStart = null;
+                dateEnd = null;
+            } else {
+                fValue.GetDateRange(out dateStart, out dateEnd);
+            }
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fValue);
         }
     }
 }

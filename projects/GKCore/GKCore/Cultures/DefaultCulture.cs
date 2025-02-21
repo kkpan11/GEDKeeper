@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,6 +19,7 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using GDModel;
 using GKCore.Interfaces;
 using GKCore.Types;
@@ -46,14 +47,23 @@ namespace GKCore.Cultures
             return sn;
         }
 
+        public static string GetMaidenSurname(string surname)
+        {
+            if (string.IsNullOrEmpty(surname)) return string.Empty;
+
+            int p = surname.IndexOf(" (");
+            string result = ((p >= 0) ? surname.Substring(0, p) : surname);
+            return result;
+        }
+
         public virtual string GetMarriedSurname(string husbSurname)
         {
             return husbSurname;
         }
 
-        public virtual GDMSex GetSex(string iName, string iPat, bool canQuery)
+        public virtual async Task<GDMSex> GetSex(string iName, string iPat, bool canQuery)
         {
-            return GDMSex.svUnknown;
+            return await Task.FromResult(GDMSex.svUnknown);
         }
 
         public virtual string[] GetSurnames(string surname, bool female)

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -23,6 +23,8 @@ using GKCore.Design.Controls;
 using GKCore.Interfaces;
 using GKCore.Lists;
 using GKCore.Design.Views;
+using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -37,6 +39,13 @@ namespace GKCore.Controllers
             base.Init(baseWin);
 
             fView.ChildrenList.ListModel = new IndividualChildrenListModel(fView, baseWin, fLocalUndoman);
+        }
+
+        public override void Done()
+        {
+            base.Done();
+
+            fView.ChildrenList.ListModel.SaveSettings();
         }
 
         protected override void UpdateListModels(GDMIndividualRecord indiRec)
@@ -90,6 +99,15 @@ namespace GKCore.Controllers
             GetControl<ILabel>("lblNameSuffix").Text = LangMan.LS(LSID.NameSuffix);
 
             GetControl<ITabPage>("pageChilds").Text = LangMan.LS(LSID.Childs);
+        }
+
+        public override void ApplyTheme()
+        {
+            base.ApplyTheme();
+
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            fView.ChildrenList.ApplyTheme();
         }
     }
 }

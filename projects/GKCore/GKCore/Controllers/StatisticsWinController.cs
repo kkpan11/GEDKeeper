@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -27,6 +27,7 @@ using GKCore.Export;
 using GKCore.Interfaces;
 using GKCore.Stats;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -156,6 +157,12 @@ namespace GKCore.Controllers
                     fView.Graph.PrepareArray(fChartTitle, fChartXTitle, fChartYTitle, ChartStyle.ClusterBar, true, fCurrentValues);
                     break;
 
+                case StatsMode.smParentsAge:
+                    fChartXTitle = LangMan.LS(LSID.ParentsAge);
+                    fChartYTitle = LangMan.LS(LSID.People);
+                    fView.Graph.PrepareArray(fChartTitle, fChartXTitle, fChartYTitle, ChartStyle.ClusterBar, true, fCurrentValues);
+                    break;
+
                 default:
                     fView.Graph.Clear();
                     break;
@@ -226,10 +233,10 @@ namespace GKCore.Controllers
                 string.Format("{0:0.00}", item.FemaleVal));
         }
 
-        public void ExportToExcel()
+        public async void ExportToExcel()
         {
-            string fileName;
-            var writer = TableExporter.GetTableWriterWFN(out fileName);
+            string fileName = await TableExporter.GetTableFile();
+            var writer = TableExporter.GetTableWriter(fileName);
             if (writer == null) return;
 
             AppHost.Instance.ExecuteWork((controller) => {
@@ -260,6 +267,13 @@ namespace GKCore.Controllers
             int oldIndex = fView.StatsType.SelectedIndex;
             UpdateStatsTypes();
             fView.StatsType.SelectedIndex = oldIndex;
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("tbExcelExport").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_ExportTable);
         }
     }
 }

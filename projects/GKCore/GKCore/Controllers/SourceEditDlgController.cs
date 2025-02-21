@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,7 @@ using GKCore.Design.Views;
 using GKCore.Interfaces;
 using GKCore.Lists;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -57,9 +58,18 @@ namespace GKCore.Controllers
         {
             base.Init(baseWin);
 
-            fView.RepositoriesList.ListModel = new SourceRepositoriesListModel(fView, baseWin, fLocalUndoman);
+            fView.RepositoriesList.ListModel = new RepositoryCitationsListModel(fView, baseWin, fLocalUndoman);
             fView.NotesList.ListModel = new NoteLinksListModel(fView, baseWin, fLocalUndoman);
             fView.MediaList.ListModel = new MediaLinksListModel(fView, baseWin, fLocalUndoman);
+            fView.UserRefList.ListModel = new URefsListModel(fView, baseWin, fLocalUndoman);
+        }
+
+        public override void Done()
+        {
+            fView.RepositoriesList.ListModel.SaveSettings();
+            fView.NotesList.ListModel.SaveSettings();
+            fView.MediaList.ListModel.SaveSettings();
+            fView.UserRefList.ListModel.SaveSettings();
         }
 
         public override bool Accept()
@@ -74,6 +84,16 @@ namespace GKCore.Controllers
                 fSourceRecord.SetPublicationArray(fView.Publication.Lines);
                 fSourceRecord.Text.Clear();
                 fSourceRecord.SetTextArray(fView.Text.Lines);
+
+                try {
+                    GDMCustomDate dt = fView.Date.Date;
+                    if (dt == null) throw new ArgumentNullException("dt");
+
+                    fSourceRecord.Date.ParseString(dt.StringValue);
+                } catch (Exception ex) {
+                    AppHost.StdDialogs.ShowError(LangMan.LS(LSID.DateInvalid));
+                    throw ex;
+                }
 
                 fLocalUndoman.Commit();
 
@@ -94,9 +114,12 @@ namespace GKCore.Controllers
             fView.Publication.Text = fSourceRecord.Publication.Lines.Text.Trim();
             fView.Text.Text = fSourceRecord.Text.Lines.Text.Trim();
 
+            fView.Date.Date = fSourceRecord.Date.Value;
+
             fView.RepositoriesList.ListModel.DataOwner = fSourceRecord;
             fView.NotesList.ListModel.DataOwner = fSourceRecord;
             fView.MediaList.ListModel.DataOwner = fSourceRecord;
+            fView.UserRefList.ListModel.DataOwner = fSourceRecord;
         }
 
         public override void SetLocale()
@@ -109,11 +132,26 @@ namespace GKCore.Controllers
             GetControl<ILabel>("lblAuthor").Text = LangMan.LS(LSID.Author);
             GetControl<ILabel>("lblTitle").Text = LangMan.LS(LSID.Title);
             GetControl<ILabel>("lblPublication").Text = LangMan.LS(LSID.Publication);
+            GetControl<ILabel>("lblDate").Text = LangMan.LS(LSID.Date);
             GetControl<ITabPage>("pageCommon").Text = LangMan.LS(LSID.Common);
             GetControl<ITabPage>("pageText").Text = LangMan.LS(LSID.Text);
             GetControl<ITabPage>("pageRepositories").Text = LangMan.LS(LSID.RPRepositories);
             GetControl<ITabPage>("pageNotes").Text = LangMan.LS(LSID.RPNotes);
             GetControl<ITabPage>("pageMultimedia").Text = LangMan.LS(LSID.RPMultimedia);
+            GetControl<ITabPage>("pageUserRefs").Text = LangMan.LS(LSID.UserRefs);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            fView.RepositoriesList.ApplyTheme();
+            fView.NotesList.ApplyTheme();
+            fView.MediaList.ApplyTheme();
+            fView.UserRefList.ApplyTheme();
         }
     }
 }

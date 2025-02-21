@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,7 @@ using GKCore.Lists;
 using GKCore.Design;
 using GKCore.Design.Views;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -62,6 +63,13 @@ namespace GKCore.Controllers
             fView.MediaList.ListModel = new MediaLinksListModel(fView, baseWin, fLocalUndoman);
         }
 
+        public override void Done()
+        {
+            fView.MembersList.ListModel.SaveSettings();
+            fView.NotesList.ListModel.SaveSettings();
+            fView.MediaList.ListModel.SaveSettings();
+        }
+
         public override bool Accept()
         {
             try {
@@ -96,6 +104,18 @@ namespace GKCore.Controllers
             GetControl<ITabPage>("pageMembers").Text = LangMan.LS(LSID.Members);
             GetControl<ITabPage>("pageNotes").Text = LangMan.LS(LSID.RPNotes);
             GetControl<ITabPage>("pageMultimedia").Text = LangMan.LS(LSID.RPMultimedia);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            fView.MembersList.ApplyTheme();
+            fView.NotesList.ApplyTheme();
+            fView.MediaList.ApplyTheme();
         }
     }
 }

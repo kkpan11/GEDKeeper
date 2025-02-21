@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2021 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -27,6 +27,7 @@ namespace GDModel
     public sealed class GDMSourceRecord : GDMRecord
     {
         private GDMSourceData fData;
+        private readonly GDMDateValue fDate;
         private GDMTextTag fOriginator;
         private GDMTextTag fPublication;
         private GDMList<GDMRepositoryCitation> fRepositoryCitations;
@@ -38,6 +39,11 @@ namespace GDModel
         public GDMSourceData Data
         {
             get { return fData; }
+        }
+
+        public GDMDateValue Date
+        {
+            get { return fDate; }
         }
 
         public GDMTextTag Originator
@@ -83,6 +89,9 @@ namespace GDModel
             fShortTitle = string.Empty;
             fText = new GDMTextTag((int)GEDCOMTagType.TEXT);
             fTitle = new GDMTextTag((int)GEDCOMTagType.TITL);
+
+            fDate = new GDMDateValue();
+            fDate.SetName(GEDCOMTagType._DATE);
         }
 
         protected override void Dispose(bool disposing)
@@ -94,6 +103,8 @@ namespace GDModel
                 fRepositoryCitations.Dispose();
                 fText.Dispose();
                 fTitle.Dispose();
+
+                fDate.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -108,6 +119,8 @@ namespace GDModel
             fRepositoryCitations.TrimExcess();
             fText.TrimExcess();
             fTitle.TrimExcess();
+
+            fDate.TrimExcess();
         }
 
         public override void Assign(GDMTag source)
@@ -125,6 +138,8 @@ namespace GDModel
             fText.Assign(otherSource.fText);
             fTitle.Assign(otherSource.fTitle);
             AssignList(otherSource.fRepositoryCitations, fRepositoryCitations);
+
+            fDate.Assign(otherSource.fDate);
         }
 
         public override void Clear()
@@ -138,13 +153,16 @@ namespace GDModel
             fRepositoryCitations.Clear();
             fText.Clear();
             fTitle.Clear();
+
+            fDate.Clear();
         }
 
         public override bool IsEmpty()
         {
             return base.IsEmpty() && fData.IsEmpty() && fOriginator.IsEmpty() && fPublication.IsEmpty()
                 && string.IsNullOrEmpty(fShortTitle) && fText.IsEmpty() && fTitle.IsEmpty()
-                && (fRepositoryCitations.Count == 0);
+                && (fRepositoryCitations.Count == 0)
+                && fDate.IsEmpty();
         }
 
         public override void MoveTo(GDMRecord targetRecord)
@@ -174,12 +192,17 @@ namespace GDModel
                 GDMRepositoryCitation obj = fRepositoryCitations.Extract(0);
                 targetSource.RepositoryCitations.Add(obj);
             }
+
+            if (targetSource.Date.IsEmpty() && !fDate.IsEmpty()) {
+                targetSource.Date.Assign(fDate);
+            }
         }
 
         public override void ReplaceXRefs(GDMXRefReplacer map)
         {
             base.ReplaceXRefs(map);
             fRepositoryCitations.ReplaceXRefs(map);
+            fDate.ReplaceXRefs(map);
         }
 
 
@@ -236,7 +259,7 @@ namespace GDModel
 
             foreach (GDMRepositoryCitation repCit in fRepositoryCitations) {
                 if (repCit.XRef == repRec.XRef) {
-                    fRepositoryCitations.Delete(repCit);
+                    fRepositoryCitations.Remove(repCit);
                     break;
                 }
             }
@@ -255,6 +278,20 @@ namespace GDModel
             }
 
             return null;
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fData);
+            hashCode.Add(fDate);
+            hashCode.Add(fOriginator);
+            hashCode.Add(fPublication);
+            ProcessHashes(ref hashCode, fRepositoryCitations);
+            hashCode.Add(fShortTitle);
+            hashCode.Add(fText);
+            hashCode.Add(fTitle);
         }
     }
 }

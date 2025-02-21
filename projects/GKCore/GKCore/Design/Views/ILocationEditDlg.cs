@@ -32,6 +32,8 @@ namespace GKCore.Design.Views
         IMapBrowser MapBrowser { get; }
         ISheetList MediaList { get; }
         ISheetList NotesList { get; }
+        ISheetList NamesList { get; }
+        ISheetList LinksList { get; }
         IListView GeoCoordsList { get; }
         ITextBox Name { get; }
         ITextBox Latitude { get; }

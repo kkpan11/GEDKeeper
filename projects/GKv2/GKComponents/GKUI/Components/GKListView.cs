@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -283,6 +283,10 @@ namespace GKUI.Components
             set { fSortOrder = value; }
         }
 
+
+        public event EventHandler ItemsUpdated;
+
+
         public GKListView()
         {
             fAppearance = new ListViewAppearance(this);
@@ -415,18 +419,6 @@ namespace GKUI.Components
                         DrawSortArrow(gfx, rt, "▼");
                         break;
                 }
-
-                /*if (e.ColumnIndex == Columns.Count - 1) {
-                    IntPtr headerControl = Win32.GetHeaderControl(this);
-                    IntPtr hdc = Win32.GetDC(headerControl);
-                    Graphics g = Graphics.FromHdc(hdc);
-                    Rectangle rc = new Rectangle(e.Bounds.Right, e.Bounds.Top, ClientRectangle.Width - e.Bounds.X, e.Bounds.Height);
-                    using (Brush brush = new SolidBrush(fAppearance.Header)) {
-                        g.FillRectangle(brush, rc);
-                    }
-                    g.Dispose();
-                    Win32.ReleaseDC(headerControl, hdc);
-                }*/
             }
 
             base.OnDrawColumnHeader(e);
@@ -570,21 +562,21 @@ namespace GKUI.Components
             }
         }
 
+        private void DoItemsUpdated()
+        {
+            var eventHandler = ItemsUpdated;
+            if (eventHandler != null) eventHandler(this, new EventArgs());
+        }
+
         public void UpdateContents(bool columnsChanged = false)
         {
             if (fListMan == null) return;
 
             try {
-                if (fListMan.ColumnsHaveBeenChanged != columnsChanged && columnsChanged) {
-                    fListMan.ColumnsHaveBeenChanged = columnsChanged;
-                }
-
                 object tempRec = GetSelectedData();
-
                 BeginUpdate();
                 try {
-                    if (columnsChanged || Columns.Count == 0 || fListMan.ColumnsHaveBeenChanged) {
-                        Columns.Clear();
+                    if (columnsChanged || Columns.Count == 0) {
                         fListMan.UpdateColumns(this);
                     }
 
@@ -601,9 +593,10 @@ namespace GKUI.Components
                     ResizeColumns();
                 } finally {
                     EndUpdate();
-                }
+                    if (tempRec != null) SelectItem(tempRec);
 
-                if (tempRec != null) SelectItem(tempRec);
+                    DoItemsUpdated();
+                }
             } catch (Exception ex) {
                 Logger.WriteError("GKListView.UpdateContents()", ex);
             }
@@ -686,6 +679,16 @@ namespace GKUI.Components
         public void ClearItems()
         {
             Items.Clear();
+        }
+
+        public BSDListItem AddItem(object rowData, bool isChecked, Color backColor, params object[] columnValues)
+        {
+            var item = AddItem(rowData, columnValues);
+            if (CheckBoxes) {
+                ((GKListItem)item).Checked = isChecked;
+            }
+            ((GKListItem)item).BackColor = backColor;
+            return item;
         }
 
         public BSDListItem AddItem(object rowData, bool isChecked, params object[] columnValues)
@@ -787,6 +790,10 @@ namespace GKUI.Components
 
         public void SelectItem(int index)
         {
+            if (index == -1) {
+                index = Items.Count - 1;
+            }
+
             if (index >= 0 && index < Items.Count) {
                 var item = (GKListItem)Items[index];
                 SelectItem(index, item);

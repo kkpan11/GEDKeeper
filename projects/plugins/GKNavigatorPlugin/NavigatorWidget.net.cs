@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -22,6 +22,7 @@
 
 using System;
 using System.IO;
+using Eto.Drawing;
 using Eto.Forms;
 using Eto.Serialization.Xaml;
 using GDModel;
@@ -36,8 +37,10 @@ namespace GKNavigatorPlugin
         #region Design components
 #pragma warning disable CS0169, CS0649, IDE0044, IDE0051
 
-        private GKListView lvData;
+        private Panel placeholder;
         private TreeView treeView1;
+        private GKListView lvData;
+        private WebLinksView webLinksView;
 
 #pragma warning restore CS0169, CS0649, IDE0044, IDE0051
         #endregion
@@ -69,6 +72,7 @@ namespace GKNavigatorPlugin
         private GKTreeNode tnRecsLocation;
         private GKTreeNode tnLanguages;
         private GKTreeNode tnAssociations;
+        private GKTreeNode tnWebLinks;
 
         public NavigatorWidget(Plugin plugin)
         {
@@ -98,6 +102,7 @@ namespace GKNavigatorPlugin
             tnBookmarks = CreateNode(tnRoot, "Bookmarks", DataCategory.Bookmarks);
             tnLanguages = CreateNode(tnRoot, "Languages", DataCategory.Languages);
             tnAssociations = CreateNode(tnRoot, "Associations", DataCategory.Associations);
+            tnWebLinks = CreateNode(tnRoot, "WebLinks", DataCategory.WebLinks);
 
             tnRecords = CreateNode(tnRoot, "Records", null);
             tnRecsIndividual = CreateNode(tnRecords, "Individuals", GDMRecordType.rtIndividual);
@@ -111,6 +116,13 @@ namespace GKNavigatorPlugin
             tnRecsTask = CreateNode(tnRecords, "Tasks", GDMRecordType.rtTask);
             tnRecsCommunication = CreateNode(tnRecords, "Communications", GDMRecordType.rtCommunication);
             tnRecsLocation = CreateNode(tnRecords, "Locations", GDMRecordType.rtLocation);
+
+            lvData = new GKListView();
+            lvData.Size = new Size(391, 498);
+            lvData.MouseDown += lvData_SelectedIndexChanged;
+
+            webLinksView = new WebLinksView();
+            webLinksView.Size = new Size(391, 498);
         }
 
         public void SetLocale()
@@ -122,8 +134,9 @@ namespace GKNavigatorPlugin
             tnFilters.Text = fLangMan.LS(PLS.Filters);
             tnBookmarks.Text = fLangMan.LS(PLS.Bookmarks);
             tnLanguages.Text = fLangMan.LS(PLS.Languages);
-            tnAssociations.Text = fLangMan.LS(PLS.Associations);
+            tnAssociations.Text = LangMan.LS(LSID.Associations);
             tnRecords.Text = fLangMan.LS(PLS.Records);
+            tnWebLinks.Text = fLangMan.LS(PLS.WebLinks);
         }
 
         private void Form_Shown(object sender, EventArgs e)
@@ -184,17 +197,17 @@ namespace GKNavigatorPlugin
                     //treeView1.BeginUpdate();
 
                     tnRoot.Text = dbName;
-                    tnRecsIndividual.Text = FmtTitle(fLangMan.LS(PLS.Individuals), stats[(int)GDMRecordType.rtIndividual]);
-                    tnRecsFamily.Text = FmtTitle(fLangMan.LS(PLS.Families), stats[(int)GDMRecordType.rtFamily]);
-                    tnRecsNote.Text = FmtTitle(fLangMan.LS(PLS.Notes), stats[(int)GDMRecordType.rtNote]);
-                    tnRecsMultimedia.Text = FmtTitle(fLangMan.LS(PLS.Multimedia), stats[(int)GDMRecordType.rtMultimedia]);
-                    tnRecsSource.Text = FmtTitle(fLangMan.LS(PLS.Sources), stats[(int)GDMRecordType.rtSource]);
-                    tnRecsRepository.Text = FmtTitle(fLangMan.LS(PLS.Repositories), stats[(int)GDMRecordType.rtRepository]);
-                    tnRecsGroup.Text = FmtTitle(fLangMan.LS(PLS.Groups), stats[(int)GDMRecordType.rtGroup]);
-                    tnRecsResearch.Text = FmtTitle(fLangMan.LS(PLS.Researches), stats[(int)GDMRecordType.rtResearch]);
-                    tnRecsTask.Text = FmtTitle(fLangMan.LS(PLS.Tasks), stats[(int)GDMRecordType.rtTask]);
-                    tnRecsCommunication.Text = FmtTitle(fLangMan.LS(PLS.Communications), stats[(int)GDMRecordType.rtCommunication]);
-                    tnRecsLocation.Text = FmtTitle(fLangMan.LS(PLS.Locations), stats[(int)GDMRecordType.rtLocation]);
+                    tnRecsIndividual.Text = FmtTitle(LangMan.LS(LSID.RPIndividuals), stats[(int)GDMRecordType.rtIndividual]);
+                    tnRecsFamily.Text = FmtTitle(LangMan.LS(LSID.RPFamilies), stats[(int)GDMRecordType.rtFamily]);
+                    tnRecsNote.Text = FmtTitle(LangMan.LS(LSID.RPNotes), stats[(int)GDMRecordType.rtNote]);
+                    tnRecsMultimedia.Text = FmtTitle(LangMan.LS(LSID.RPMultimedia), stats[(int)GDMRecordType.rtMultimedia]);
+                    tnRecsSource.Text = FmtTitle(LangMan.LS(LSID.RPSources), stats[(int)GDMRecordType.rtSource]);
+                    tnRecsRepository.Text = FmtTitle(LangMan.LS(LSID.RPRepositories), stats[(int)GDMRecordType.rtRepository]);
+                    tnRecsGroup.Text = FmtTitle(LangMan.LS(LSID.RPGroups), stats[(int)GDMRecordType.rtGroup]);
+                    tnRecsResearch.Text = FmtTitle(LangMan.LS(LSID.RPResearches), stats[(int)GDMRecordType.rtResearch]);
+                    tnRecsTask.Text = FmtTitle(LangMan.LS(LSID.RPTasks), stats[(int)GDMRecordType.rtTask]);
+                    tnRecsCommunication.Text = FmtTitle(LangMan.LS(LSID.RPCommunications), stats[(int)GDMRecordType.rtCommunication]);
+                    tnRecsLocation.Text = FmtTitle(LangMan.LS(LSID.RPLocations), stats[(int)GDMRecordType.rtLocation]);
 
                     tnHiddenRoot.Expanded = true;
                     tnRoot.Expanded = true;
@@ -224,6 +237,13 @@ namespace GKNavigatorPlugin
             if (treeView1.SelectedItem == null) return;
             object tag = ((GKTreeNode)treeView1.SelectedItem).Tag;
             if (tag == null) return;
+
+            if (tag is DataCategory dataCat && dataCat == DataCategory.WebLinks) {
+                placeholder.Content = webLinksView;
+            } else {
+                placeholder.Content = lvData;
+            }
+
             fPlugin.Data.ShowItem(fBase, tag, lvData);
         }
 

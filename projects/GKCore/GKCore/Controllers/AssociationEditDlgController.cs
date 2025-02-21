@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -25,6 +25,7 @@ using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Options;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -52,6 +53,7 @@ namespace GKCore.Controllers
         public AssociationEditDlgController(IAssociationEditDlg view) : base(view)
         {
             fView.Relation.AddStrings(GlobalOptions.Instance.Relations);
+            fView.Relation.ReadOnly = false;
         }
 
         public override bool Accept()
@@ -78,9 +80,9 @@ namespace GKCore.Controllers
             fView.Person.Text = (fTempPerson == null) ? "" : GKUtils.GetNameString(fTempPerson, false);
         }
 
-        public void SetPerson()
+        public async void SetPerson()
         {
-            fTempPerson = fBase.Context.SelectPerson(fView, null, TargetMode.tmNone, GDMSex.svUnknown);
+            fTempPerson = await fBase.Context.SelectPerson(fView, null, TargetMode.tmNone, GDMSex.svUnknown);
             fView.Person.Text = (fTempPerson == null) ? "" : GKUtils.GetNameString(fTempPerson, false);
         }
 
@@ -94,6 +96,16 @@ namespace GKCore.Controllers
             GetControl<ILabel>("lblPerson").Text = LangMan.LS(LSID.Person);
 
             SetToolTip("btnPersonAdd", LangMan.LS(LSID.PersonAttachTip));
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            GetControl<IButton>("btnPersonAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
         }
     }
 }

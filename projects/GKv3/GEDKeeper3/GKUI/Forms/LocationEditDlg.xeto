@@ -42,6 +42,7 @@
                           <Button x:Name="btnSearch" Style="funcBtn" Click="btnSearch_Click" />
                           <Button x:Name="btnSelect" Style="funcBtn" Click="btnSelect_Click" />
                           <Button x:Name="btnSelectName" Style="funcBtn" Click="btnSelectName_Click" />
+                          <Button x:Name="btnSelectCursor" Style="funcBtn" Click="btnSelectCursor_Click" />
                           <Button x:Name="btnShowOnMap" Style="funcBtn" Click="btnShowOnMap_Click" />
                         </StackLayout>
                       </TableRow>
@@ -57,6 +58,22 @@
           </TableLayout>
         </TabPage>
 
+        <TabPage x:Name="pageHistory">
+          <TableLayout x:Name="tabsHistory">
+            <TableRow ScaleHeight="true">
+              <GroupBox x:Name="pageHistNames">
+                <comcom:GKSheetList x:Name="fNamesList" />
+              </GroupBox>
+            </TableRow>
+
+            <TableRow ScaleHeight="true">
+              <GroupBox x:Name="pageHistLinks">
+                <comcom:GKSheetList x:Name="fLinksList" />
+              </GroupBox>
+            </TableRow>
+          </TableLayout>
+        </TabPage>
+
         <TabPage x:Name="pageNotes">
           <comcom:GKSheetList x:Name="fNotesList" />
         </TabPage>
@@ -67,14 +84,10 @@
     </TableRow>
 
     <TableRow>
-      <StackLayout Spacing="8" Orientation="Horizontal">
+      <StackLayout Style="dlgFooter">
         <StackLayoutItem Expand="True" />
-        <StackLayoutItem HorizontalAlignment="Right">
-          <Button x:Name="btnAccept" Style="dlgBtn" Image="{Resource Resources.btn_accept.gif, GKCore}" Click="AcceptClickHandler" />
-        </StackLayoutItem>
-        <StackLayoutItem HorizontalAlignment="Right">
-          <Button x:Name="btnCancel" Style="dlgBtn" Image="{Resource Resources.btn_cancel.gif, GKCore}" Click="CancelClickHandler" />
-        </StackLayoutItem>
+        <Button x:Name="btnAccept" Style="dlgBtn" Image="{Resource Resources.btn_accept.gif, GKCore}" Click="AcceptClickHandler" />
+        <Button x:Name="btnCancel" Style="dlgBtn" Image="{Resource Resources.btn_cancel.gif, GKCore}" Click="CancelClickHandler" />
       </StackLayout>
     </TableRow>
 

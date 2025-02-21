@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -21,6 +21,7 @@
 using System;
 using System.Collections.Generic;
 using GDModel.Providers.GEDCOM;
+using GKCore;
 using GKCore.Calendar;
 using GKCore.Interfaces;
 
@@ -42,16 +43,16 @@ namespace GDModel
 
         private struct TreeEnumerator : IGDMTreeEnumerator
         {
-            private readonly GDMTree fTree;
+            private readonly IList<GDMRecord> fTreeRecords;
             private readonly GDMRecordType fRecType;
             private readonly int fEndIndex;
             private int fIndex;
 
             public TreeEnumerator(GDMTree tree, GDMRecordType recType)
             {
-                fTree = tree;
+                fTreeRecords = tree.fRecords.GetList();
                 fIndex = -1;
-                fEndIndex = tree.RecordsCount - 1;
+                fEndIndex = ((fTreeRecords == null) ? 0 : fTreeRecords.Count) - 1;
                 fRecType = recType;
             }
 
@@ -60,13 +61,13 @@ namespace GDModel
                 if (fRecType == GDMRecordType.rtNone) {
                     if (fIndex < fEndIndex) {
                         fIndex++;
-                        current = fTree[fIndex];
+                        current = fTreeRecords[fIndex];
                         return true;
                     }
                 } else {
                     while (fIndex < fEndIndex) {
                         fIndex++;
-                        GDMRecord rec = fTree[fIndex];
+                        GDMRecord rec = fTreeRecords[fIndex];
                         if (rec.RecordType == fRecType) {
                             current = rec;
                             return true;
@@ -87,22 +88,22 @@ namespace GDModel
 
         private struct TreeEnumerator<T> : IGDMTreeEnumerator<T> where T : GDMRecord
         {
-            private readonly GDMTree fTree;
+            private readonly IList<GDMRecord> fTreeRecords;
             private readonly int fEndIndex;
             private int fIndex;
 
             public TreeEnumerator(GDMTree tree)
             {
-                fTree = tree;
+                fTreeRecords = tree.fRecords.GetList();
                 fIndex = -1;
-                fEndIndex = tree.RecordsCount - 1;
+                fEndIndex = ((fTreeRecords == null) ? 0 : fTreeRecords.Count) - 1;
             }
 
             public bool MoveNext(out T current)
             {
                 while (fIndex < fEndIndex) {
                     fIndex++;
-                    T rec = fTree[fIndex] as T;
+                    T rec = fTreeRecords[fIndex] as T;
                     if (rec != null) {
                         current = rec;
                         return true;
@@ -118,7 +119,7 @@ namespace GDModel
             {
                 while (fIndex < fEndIndex) {
                     fIndex++;
-                    var rec = fTree[fIndex];
+                    var rec = fTreeRecords[fIndex];
                     if (rec != null) {
                         current = rec;
                         return true;
@@ -276,8 +277,8 @@ namespace GDModel
         public void SetXRef(string oldXRef, GDMRecord record, bool removeOldXRef)
         {
             if (removeOldXRef && !string.IsNullOrEmpty(oldXRef)) {
-                bool exists = fXRefIndex.ContainsKey(oldXRef);
-                if (exists) fXRefIndex.Remove(oldXRef);
+                // remove can verify existing of key
+                fXRefIndex.Remove(oldXRef);
             }
 
             XRefIndex_AddRecord(record);
@@ -294,6 +295,20 @@ namespace GDModel
             for (int i = 0; i < fRecords.Count; i++) {
                 T rec = fRecords[i] as T;
                 if (rec != null) {
+                    result.Add(rec);
+                }
+            }
+
+            return result;
+        }
+
+        public List<GDMRecord> GetRecords(GDMRecordType recType)
+        {
+            var result = new List<GDMRecord>();
+
+            for (int i = 0; i < fRecords.Count; i++) {
+                var rec = fRecords[i];
+                if (recType == GDMRecordType.rtNone || rec.RecordType == recType) {
                     result.Add(rec);
                 }
             }
@@ -329,13 +344,13 @@ namespace GDModel
         public void Delete(int index)
         {
             XRefIndex_DeleteRecord(fRecords[index]);
-            fRecords.DeleteAt(index);
+            fRecords.RemoveAt(index);
         }
 
         public void DeleteRecord(GDMRecord record)
         {
             XRefIndex_DeleteRecord(record);
-            fRecords.Delete(record);
+            fRecords.Remove(record);
         }
 
         public GDMRecord Extract(int index)
@@ -371,7 +386,7 @@ namespace GDModel
 
         public T GetPtrValue<T>(GDMPointer ptr) where T : GDMRecord
         {
-            return (ptr == null || !ptr.IsPointer) ? default(T) : XRefIndex_Find(ptr.XRef) as T;
+            return (ptr == null || !ptr.IsPointer) ? default : XRefIndex_Find(ptr.XRef) as T;
         }
 
         public void SetPtrValue(GDMPointer ptr, GDMRecord record)
@@ -573,7 +588,7 @@ namespace GDModel
 
                 for (int j = rec.MultimediaLinks.Count - 1; j >= 0; j--) {
                     if (rec.MultimediaLinks[j].XRef == mRec.XRef) {
-                        rec.MultimediaLinks.DeleteAt(j);
+                        rec.MultimediaLinks.RemoveAt(j);
                     }
                 }
             }
@@ -591,7 +606,7 @@ namespace GDModel
                 GDMRecord rec = fRecords[i];
                 for (int j = rec.Notes.Count - 1; j >= 0; j--) {
                     if (rec.Notes[j].XRef == nRec.XRef)
-                        rec.Notes.DeleteAt(j);
+                        rec.Notes.RemoveAt(j);
                 }
             }
 
@@ -610,7 +625,7 @@ namespace GDModel
                     GDMSourceRecord srcRec = (GDMSourceRecord)rec;
                     for (int j = srcRec.RepositoryCitations.Count - 1; j >= 0; j--) {
                         if (srcRec.RepositoryCitations[j].XRef == repRec.XRef) {
-                            srcRec.RepositoryCitations.DeleteAt(j);
+                            srcRec.RepositoryCitations.RemoveAt(j);
                         }
                     }
                 }
@@ -639,7 +654,7 @@ namespace GDModel
 
                 for (int j = rec.SourceCitations.Count - 1; j >= 0; j--) {
                     if (rec.SourceCitations[j].XRef == srcRec.XRef) {
-                        rec.SourceCitations.DeleteAt(j);
+                        rec.SourceCitations.RemoveAt(j);
                     }
                 }
             }
@@ -659,7 +674,7 @@ namespace GDModel
                     GDMResearchRecord resRec = (GDMResearchRecord)rec;
                     for (int j = resRec.Tasks.Count - 1; j >= 0; j--) {
                         if (resRec.Tasks[j].XRef == taskRec.XRef) {
-                            resRec.Tasks.DeleteAt(j);
+                            resRec.Tasks.RemoveAt(j);
                         }
                     }
                 }
@@ -680,7 +695,7 @@ namespace GDModel
                     GDMResearchRecord resRec = (GDMResearchRecord)rec;
                     for (int j = resRec.Communications.Count - 1; j >= 0; j--) {
                         if (resRec.Communications[j].XRef == commRec.XRef) {
-                            resRec.Communications.DeleteAt(j);
+                            resRec.Communications.RemoveAt(j);
                         }
                     }
                 }
@@ -696,17 +711,38 @@ namespace GDModel
 
             int num = fRecords.Count;
             for (int i = 0; i < num; i++) {
-                var evsRec = fRecords[i] as GDMRecordWithEvents;
-                if (evsRec == null || !evsRec.HasEvents) continue;
+                var rec = fRecords[i];
 
-                for (int j = evsRec.Events.Count - 1; j >= 0; j--) {
-                    var evt = evsRec.Events[j];
-                    if (!evt.HasPlace) continue;
+                switch (rec.RecordType) {
+                    case GDMRecordType.rtIndividual:
+                    case GDMRecordType.rtFamily: {
+                            var evsRec = rec as GDMRecordWithEvents;
+                            if (evsRec == null || !evsRec.HasEvents) continue;
 
-                    GDMPointer evLocation = evt.Place.Location;
-                    if (evLocation.XRef == locRec.XRef) {
-                        evLocation.XRef = string.Empty;
-                    }
+                            for (int j = evsRec.Events.Count - 1; j >= 0; j--) {
+                                var evt = evsRec.Events[j];
+                                if (!evt.HasPlace) continue;
+
+                                GDMPointer evLocation = evt.Place.Location;
+                                if (evLocation.XRef == locRec.XRef) {
+                                    evLocation.XRef = string.Empty;
+                                }
+                            }
+                        }
+                        break;
+
+                    case GDMRecordType.rtLocation: {
+                            var lRec = rec as GDMLocationRecord;
+                            if (lRec == null) continue;
+
+                            for (int j = lRec.TopLevels.Count - 1; j >= 0; j--) {
+                                var topLev = lRec.TopLevels[j];
+                                if (topLev.XRef == locRec.XRef) {
+                                    lRec.TopLevels.RemoveAt(j);
+                                }
+                            }
+                        }
+                        break;
                 }
             }
 
@@ -729,7 +765,7 @@ namespace GDModel
 
                     GDMPlace evPlace = evt.Place;
                     if (evPlace.Location.XRef == locRec.XRef) {
-                        evPlace.StringValue = locRec.LocationName;
+                        evPlace.StringValue = GKUtils.GetLocationNameExt(locRec, evt.Date.Value);
                     }
                 }
             }
@@ -746,7 +782,7 @@ namespace GDModel
             return udn1.CompareTo(udn2);
         }
 
-        public void SortChilds(GDMFamilyRecord famRec)
+        public void SortChildren(GDMFamilyRecord famRec)
         {
             if (famRec != null) {
                 famRec.Children.Sort(ChildrenEventsCompare);

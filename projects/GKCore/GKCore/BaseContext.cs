@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -24,12 +24,14 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GDModel.Providers;
 using GDModel.Providers.FamilyShow;
 using GDModel.Providers.GEDCOM;
 using GDModel.Providers.GedML;
+using GDModel.Providers.GEDZIP;
 using GKCore.Controllers;
 using GKCore.Cultures;
 using GKCore.Design;
@@ -190,10 +192,18 @@ namespace GKCore
         {
             if (evt == null) return;
 
-            string evName = evt.GetTagName();
+            string evKey = evt.GetEventKey();
             string evVal = evt.StringValue;
-            if (!string.IsNullOrEmpty(evName) && !string.IsNullOrEmpty(evVal)) {
-                fValuesCollection.Add(evName, evVal, true);
+            if (!string.IsNullOrEmpty(evKey) && !string.IsNullOrEmpty(evVal)) {
+                fValuesCollection.Add(evKey, evVal);
+            }
+
+            if (!string.IsNullOrEmpty(evt.Cause)) {
+                fValuesCollection.Add(GEDCOMTagName.CAUS, evt.Cause);
+            }
+
+            if (!string.IsNullOrEmpty(evt.Agency)) {
+                fValuesCollection.Add(GEDCOMTagName.AGNC, evt.Agency);
             }
         }
 
@@ -212,19 +222,19 @@ namespace GKCore
             AppHost.NamesTable.ImportNames(this, iRec);
         }
 
-        public GDMCustomEvent CreateEventEx(GDMRecordWithEvents aRec, string evSign, GDMCustomDate evDate, string evPlace)
+        public GDMCustomEvent CreateEventEx(GDMRecordWithEvents aRec, string evTag, GDMCustomDate evDate, string evPlace)
         {
-            return CreateEventEx(aRec, evSign, evDate.StringValue, evPlace);
+            return CreateEventEx(aRec, evTag, evDate.StringValue, evPlace);
         }
 
-        public GDMCustomEvent CreateEventEx(GDMRecordWithEvents aRec, string evSign, string evDate, string evPlace)
+        public GDMCustomEvent CreateEventEx(GDMRecordWithEvents aRec, string evTag, string evDate, string evPlace)
         {
             if (aRec == null) return null;
 
             GDMCustomEvent result;
 
             if (aRec is GDMIndividualRecord) {
-                if (GKUtils.GetPersonEventKindBySign(evSign) == PersonEventKind.ekEvent) {
+                if (GKUtils.GetPredefinedEventKind(evTag) == EventKind.ekEvent) {
                     result = new GDMIndividualEvent();
                 } else {
                     result = new GDMIndividualAttribute();
@@ -237,7 +247,7 @@ namespace GKCore
 
             aRec.AddEvent(result);
 
-            result.SetName(evSign);
+            result.SetName(evTag);
 
             if (evDate != "") {
                 result.Date.ParseString(evDate);
@@ -263,7 +273,7 @@ namespace GKCore
             return iRec;
         }
 
-        public bool DeleteRecord(GDMRecord record)
+        public async Task<bool> DeleteRecord(GDMRecord record)
         {
             bool result = false;
             if (record == null) return result;
@@ -285,7 +295,7 @@ namespace GKCore
                         break;
 
                     case GDMRecordType.rtMultimedia:
-                        result = DeleteMediaRecord(record as GDMMultimediaRecord);
+                        result = await DeleteMediaRecord(record as GDMMultimediaRecord);
                         break;
 
                     case GDMRecordType.rtSource:
@@ -321,8 +331,7 @@ namespace GKCore
             }
 
             if (result) {
-                fTree.Header.TransmissionDateTime = DateTime.Now;
-                Modified = true;
+                SetModified();
 
                 if (fViewer != null) {
                     fViewer.NotifyRecord(record, RecordAction.raDelete);
@@ -332,13 +341,13 @@ namespace GKCore
             return result;
         }
 
-        public bool DeleteMediaRecord(GDMMultimediaRecord mRec)
+        public async Task<bool> DeleteMediaRecord(GDMMultimediaRecord mRec)
         {
             if (mRec == null)
                 throw new ArgumentNullException("mRec");
 
             if (mRec.FileReferences.Count > 0) {
-                bool fileDeleted = MediaDelete(mRec.FileReferences[0]);
+                bool fileDeleted = await MediaDelete(mRec.FileReferences[0]);
                 if (!fileDeleted) {
                     // message?
                     return false;
@@ -393,6 +402,34 @@ namespace GKCore
 
         #region Data search
 
+        public GDMIndividualRecord FindIndividual(string searchName, Dictionary<string, string> facts)
+        {
+            int num = fTree.RecordsCount;
+            for (int i = 0; i < num; i++) {
+                var rec = fTree[i] as GDMIndividualRecord;
+                if (rec == null) continue;
+
+                string indiName = GKUtils.GetNameString(rec, false);
+                if (indiName == searchName) {
+                    var res = true;
+                    foreach (var pair in facts) {
+                        if (pair.Key == "birth_year") {
+                            int birthYear = rec.GetChronologicalYear(GEDCOMTagName.BIRT);
+                            res = res && (birthYear.ToString() == pair.Value);
+                        }
+
+                        if (!res) break;
+                    }
+
+                    if (res) {
+                        return rec;
+                    }
+                }
+            }
+
+            return null;
+        }
+
         public GDMSourceRecord FindSource(string sourceName)
         {
             GDMSourceRecord result = null;
@@ -421,6 +458,21 @@ namespace GKCore
                 var rec = fTree[i] as GDMSourceRecord;
                 if (rec != null) {
                     sources.AddObject(rec.ShortTitle, rec);
+                }
+            }
+        }
+
+        public void GetRepositoriesList(StringList list)
+        {
+            if (list == null) return;
+
+            list.Clear();
+
+            int num = fTree.RecordsCount;
+            for (int i = 0; i < num; i++) {
+                var rec = fTree[i] as GDMRepositoryRecord;
+                if (rec != null) {
+                    list.AddObject(rec.RepositoryName, rec);
                 }
             }
         }
@@ -538,62 +590,36 @@ namespace GKCore
                 throw new ArgumentNullException("tipsList");
 
             try {
+                bool onlyAlive = true;
+                var dtNow = DateTime.Now;
+
                 bool firstTip = true;
-                int num = fTree.RecordsCount;
-                for (int i = 0; i < num; i++) {
-                    GDMRecord rec = fTree[i];
-                    if (rec.RecordType != GDMRecordType.rtIndividual) continue;
+                var indiEnum = fTree.GetEnumerator<GDMIndividualRecord>();
+                GDMIndividualRecord iRec;
+                while (indiEnum.MoveNext(out iRec)) {
+                    var lifeEvents = iRec.GetLifeEvents(true);
 
-                    GDMIndividualRecord iRec = (GDMIndividualRecord)rec;
-
-                    int days = GKUtils.GetDaysForBirth(iRec);
-                    if (days >= 0 && days < 3) {
-                        if (firstTip) {
-                            tipsList.Add("#" + LangMan.LS(LSID.BirthDays));
-                            firstTip = false;
-                        }
-
-                        string nm = Culture.GetPossessiveName(iRec);
-
-                        string tip;
-                        switch (days) {
-                            case 0:
-                                tip = string.Format(LangMan.LS(LSID.BirthdayToday), nm);
-                                break;
-                            case 1:
-                                tip = string.Format(LangMan.LS(LSID.BirthdayTomorrow), nm);
-                                break;
-                            default:
-                                tip = string.Format(LangMan.LS(LSID.DaysRemained), nm, days);
-                                break;
-                        }
-                        tipsList.Add(tip);
+                    if (onlyAlive) {
+                        if (lifeEvents.DeathEvent != null || lifeEvents.BurialEvent != null) continue;
                     }
 
                     int years;
-                    days = GKUtils.GetDaysForBirthAnniversary(iRec, out years);
-                    if (days >= 0 && days < 3) {
-                        if (firstTip) {
-                            tipsList.Add("#" + LangMan.LS(LSID.BirthDays));
-                            firstTip = false;
-                        }
+                    bool anniversary;
 
-                        string nm = Culture.GetPossessiveName(iRec);
+                    if (lifeEvents.BirthEvent == null) continue;
+                    var dt = lifeEvents.BirthEvent.Date.Value as GDMDate;
+                    if (dt == null || !dt.IsValidDate()) continue;
 
-                        string tip;
-                        switch (days) {
-                            case 0:
-                                tip = string.Format(LangMan.LS(LSID.AnniversaryToday), nm);
-                                break;
-                            case 1:
-                                tip = string.Format(LangMan.LS(LSID.AnniversaryTomorrow), nm);
-                                break;
-                            default:
-                                tip = string.Format(LangMan.LS(LSID.AnniversaryDaysRemained), nm, days);
-                                break;
-                        }
-                        tipsList.Add(tip);
+                    int days = GKUtils.GetDaysFor(dt, dtNow, out years, out anniversary);
+                    if (days < 0 || days >= 3) continue;
+
+                    if (firstTip) {
+                        tipsList.Add("#" + LangMan.LS(LSID.BirthDays));
+                        firstTip = false;
                     }
+
+                    string tip = GKUtils.GetBirthTipMessage(Culture, iRec, days, years, anniversary);
+                    tipsList.Add(tip);
                 }
             } catch (Exception ex) {
                 Logger.WriteError("BaseContext.CollectTips()", ex);
@@ -604,7 +630,7 @@ namespace GKCore
 
         #region Name and sex functions
 
-        public string DefinePatronymic(IView owner, string name, GDMSex sex, bool confirm)
+        public async Task<string> DefinePatronymic(IView owner, string name, GDMSex sex, bool confirm)
         {
             ICulture culture = this.Culture;
             if (!culture.HasPatronymic) return string.Empty;
@@ -632,12 +658,12 @@ namespace GKCore
                     break;
             }
 
-            if (result == "") {
+            if (string.IsNullOrEmpty(result)) {
                 if (!confirm) {
                     return result;
                 }
 
-                BaseController.ModifyName(owner, this, ref n);
+                await BaseController.ModifyName(owner, this, n);
             }
 
             switch (sex) {
@@ -653,32 +679,32 @@ namespace GKCore
             return result;
         }
 
-        public GDMSex DefineSex(IView owner, string iName, string iPatr)
+        public async Task<GDMSex> DefineSex(IView owner, string iName, string iPatr)
         {
             INamesTable namesTable = AppHost.NamesTable;
 
             GDMSex result = namesTable.GetSexByName(iName);
 
             if (result == GDMSex.svUnknown) {
+                result = await this.Culture.GetSex(iName, iPatr, false);
+
                 using (var dlg = AppHost.ResolveDialog<ISexCheckDlg>()) {
                     dlg.IndividualName = iName + " " + iPatr;
-                    result = this.Culture.GetSex(iName, iPatr, false);
-
                     dlg.Sex = result;
-                    if (AppHost.Instance.ShowModalX(dlg, owner, false)) {
+                    if (await AppHost.Instance.ShowModalAsync(dlg, owner, false)) {
                         result = dlg.Sex;
-
-                        if (result != GDMSex.svUnknown) {
-                            namesTable.SetNameSex(iName, result);
-                        }
                     }
+                }
+
+                if (result != GDMSex.svUnknown) {
+                    namesTable.SetNameSex(iName, result);
                 }
             }
 
             return result;
         }
 
-        public void CheckPersonSex(IView owner, GDMIndividualRecord iRec)
+        public async Task CheckPersonSex(IView owner, GDMIndividualRecord iRec)
         {
             if (iRec == null)
                 throw new ArgumentNullException("iRec");
@@ -688,7 +714,7 @@ namespace GKCore
 
                 if (iRec.Sex != GDMSex.svMale && iRec.Sex != GDMSex.svFemale) {
                     var parts = GKUtils.GetNameParts(fTree, iRec);
-                    iRec.Sex = DefineSex(owner, parts.Name, parts.Patronymic);
+                    iRec.Sex = await DefineSex(owner, parts.Name, parts.Patronymic);
                 }
             } finally {
                 EndUpdate();
@@ -702,6 +728,12 @@ namespace GKCore
         private static string GetTreePath(string treeName)
         {
             return Path.GetDirectoryName(treeName) + Path.DirectorySeparatorChar;
+        }
+
+        private string GetTreeRelativePath(string fileName)
+        {
+            string result = GKUtils.GetRelativePath(GetTreePath(fFileName), fileName);
+            return result;
         }
 
         public string GetArcFileName()
@@ -822,7 +854,7 @@ namespace GKCore
         /// <returns>The status of the existence of the file path.</returns>
         public bool CheckBasePath()
         {
-            string path = Path.GetDirectoryName(fFileName);
+            string path = string.IsNullOrEmpty(fFileName) ? string.Empty : Path.GetDirectoryName(fFileName);
 
             bool result = (!string.IsNullOrEmpty(path));
             if (!result) {
@@ -834,6 +866,55 @@ namespace GKCore
         public MediaStore GetStoreType(GDMFileReference fileReference)
         {
             return GKUtils.GetStoreType(fileReference);
+        }
+
+        public bool MoveMediaFile(GDMMultimediaRecord mediaRec, MediaStoreType newStoreType)
+        {
+            bool result = false;
+
+            if (mediaRec == null || mediaRec.FileReferences.Count < 1) return result;
+
+            var fileRef = mediaRec.FileReferences[0];
+            var oldStoreType = GKUtils.GetStoreType(fileRef).StoreType;
+
+            if (oldStoreType == newStoreType) return result;
+
+            switch (newStoreType) {
+                case MediaStoreType.mstReference:
+                    // maybe it will be implemented in the future (if make a folder selection)
+                    break;
+
+                case MediaStoreType.mstRelativeReference:
+                    if (oldStoreType == MediaStoreType.mstReference) {
+                        string targetFile = GetTreeRelativePath(fileRef.StringValue);
+                        string refPath = GKData.GKStoreTypes[(int)newStoreType].Sign + targetFile;
+                        fileRef.StringValue = FileHelper.NormalizeFilename(refPath);
+                        result = true;
+                    } else {
+                        // maybe it will be implemented in the future (if make a folder selection)
+                    }
+                    break;
+
+                case MediaStoreType.mstStorage:
+                    if (oldStoreType != MediaStoreType.mstArchive) {
+                        string currentFileName = MediaLoad(fileRef);
+                        result = MediaSave(fileRef, currentFileName, newStoreType);
+                    }
+                    break;
+
+                case MediaStoreType.mstArchive:
+                    if (oldStoreType != MediaStoreType.mstStorage) {
+                        string currentFileName = MediaLoad(fileRef);
+                        result = MediaSave(fileRef, currentFileName, newStoreType);
+                    }
+                    break;
+
+                case MediaStoreType.mstURL:
+                    // impossible in this method
+                    break;
+            }
+
+            return result;
         }
 
         public Stream MediaLoad(GDMFileReference fileReference, bool throwException)
@@ -904,11 +985,12 @@ namespace GKCore
             if (fileReference == null) return string.Empty;
 
             try {
-                if (!VerifyMediaFileWM(fileReference)) {
+                MediaStore mediaStore = GetStoreType(fileReference);
+
+                if (mediaStore.StoreType != MediaStoreType.mstURL && !VerifyMediaFileWM(fileReference)) {
                     return string.Empty;
                 }
 
-                MediaStore mediaStore = GetStoreType(fileReference);
                 string targetFn = mediaStore.FileName;
 
                 switch (mediaStore.StoreType) {
@@ -916,18 +998,19 @@ namespace GKCore
                         fileName = GetStgFolder(false) + targetFn;
                         break;
 
-                    case MediaStoreType.mstArchive:
-                        fileName = GKUtils.GetTempDir() + Path.GetFileName(targetFn);
-                        FileStream fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
-                        try {
-                            if (!File.Exists(GetArcFileName())) {
-                                AppHost.StdDialogs.ShowError(LangMan.LS(LSID.MediaFileNotLoaded));
-                            } else {
-                                ArcFileLoad(targetFn, fs);
+                    case MediaStoreType.mstArchive: {
+                            fileName = GKUtils.GetTempDir() + Path.GetFileName(targetFn);
+                            FileStream fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
+                            try {
+                                if (!File.Exists(GetArcFileName())) {
+                                    AppHost.StdDialogs.ShowError(LangMan.LS(LSID.MediaFileNotLoaded));
+                                } else {
+                                    ArcFileLoad(targetFn, fs);
+                                }
+                            } finally {
+                                fs.Close();
+                                fs.Dispose();
                             }
-                        } finally {
-                            fs.Close();
-                            fs.Dispose();
                         }
                         break;
 
@@ -946,6 +1029,19 @@ namespace GKCore
                             }
                             break;
                         }
+
+                    case MediaStoreType.mstURL: {
+                            fileName = GKUtils.GetTempDir() + Path.GetFileName(targetFn);
+                            FileStream fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
+                            try {
+                                var dataBytes = GKUtils.GetWebData(targetFn);
+                                fs.Write(dataBytes, 0, dataBytes.Length);
+                            } finally {
+                                fs.Close();
+                                fs.Dispose();
+                            }
+                        }
+                        break;
                 }
             } catch (Exception ex) {
                 Logger.WriteError("BaseContext.MediaLoad_fn()", ex);
@@ -972,8 +1068,7 @@ namespace GKCore
                     break;
 
                 case MediaStoreType.mstRelativeReference:
-                    string treeName = fFileName;
-                    targetFile = GKUtils.GetRelativePath(GetTreePath(treeName), fileName);
+                    targetFile = GetTreeRelativePath(fileName);
                     refPath = GKData.GKStoreTypes[(int)storeType].Sign + targetFile;
                     break;
 
@@ -1034,7 +1129,7 @@ namespace GKCore
             return result;
         }
 
-        public bool MediaDelete(GDMFileReference fileReference)
+        public async Task<bool> MediaDelete(GDMFileReference fileReference)
         {
             if (fileReference == null) return false;
 
@@ -1062,7 +1157,8 @@ namespace GKCore
                             if (!GlobalOptions.Instance.DeleteMediaFileWithoutConfirm) {
                                 string msg = string.Format(LangMan.LS(LSID.MediaFileDeleteQuery));
                                 // TODO: may be Yes/No/Cancel?
-                                if (!AppHost.StdDialogs.ShowQuestion(msg)) {
+                                var res = await AppHost.StdDialogs.ShowQuestion(msg);
+                                if (!res) {
                                     return false;
                                 }
                             }
@@ -1077,15 +1173,15 @@ namespace GKCore
                         break;
 
                     case MediaStoreStatus.mssFileNotFound:
-                        result = AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.ContinueQuestion, LangMan.LS(LSID.FileNotFound, fileName)));
+                        result = await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.ContinueQuestion, LangMan.LS(LSID.FileNotFound, fileName)));
                         break;
 
                     case MediaStoreStatus.mssStgNotFound:
-                        result = AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.ContinueQuestion, LangMan.LS(LSID.StgNotFound)));
+                        result = await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.ContinueQuestion, LangMan.LS(LSID.StgNotFound)));
                         break;
 
                     case MediaStoreStatus.mssArcNotFound:
-                        result = AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.ContinueQuestion, LangMan.LS(LSID.ArcNotFound)));
+                        result = await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.ContinueQuestion, LangMan.LS(LSID.ArcNotFound)));
                         break;
 
                     case MediaStoreStatus.mssBadData:
@@ -1272,14 +1368,8 @@ namespace GKCore
                     }
                 }
 
-                if (inputStream != null) {
-                    try {
-                        if (inputStream.Length != 0) {
-                            result = gfxProvider.LoadImage(inputStream, thumbWidth, thumbHeight, cutoutArea);
-                        }
-                    } finally {
-                        inputStream.Dispose();
-                    }
+                if (inputStream != null && inputStream.Length != 0) {
+                    result = gfxProvider.LoadImage(inputStream, thumbWidth, thumbHeight, cutoutArea, cachedFile);
                 }
             } catch (MediaFileNotFoundException) {
                 throw;
@@ -1353,12 +1443,12 @@ namespace GKCore
             fUndoman.Clear();
         }
 
-        public bool FileLoad(string fileName, bool showProgress = true)
+        public async Task<bool> FileLoad(string fileName, bool showProgress = true)
         {
-            return FileLoad(fileName, true, showProgress, true);
+            return await FileLoad(fileName, true, showProgress, true);
         }
 
-        public bool FileLoad(string fileName, bool loadSecure, bool showProgress, bool checkValidation)
+        public async Task<bool> FileLoad(string fileName, bool loadSecure, bool showProgress, bool checkValidation)
         {
             bool result = false;
 
@@ -1373,7 +1463,8 @@ namespace GKCore
                     fileProvider = new GEDCOMProvider(fTree);
 
                     if (loadSecure) {
-                        if (!AppHost.StdDialogs.GetPassword(LangMan.LS(LSID.Password), ref pw)) {
+                        pw = await AppHost.StdDialogs.GetPassword(LangMan.LS(LSID.Password));
+                        if (string.IsNullOrEmpty(pw)) {
                             AppHost.StdDialogs.ShowError(LangMan.LS(LSID.PasswordIsNotSpecified));
                             return false;
                         }
@@ -1384,6 +1475,8 @@ namespace GKCore
                     fileProvider = new GedMLProvider(fTree);
                 } else if (ext == ".familyx") {
                     fileProvider = new FamilyXProvider(fTree);
+                } else if (ext == ".gdz" || ext == ".zip") {
+                    fileProvider = new GEDZIPProvider(fTree);
                 } else {
                     // TODO: message?
                     return false;
@@ -1437,16 +1530,19 @@ namespace GKCore
             fFileName = fileName;
         }
 
-        public bool FileSave(string fileName)
+        public async Task<bool> FileSave(string fileName)
         {
             bool result = false;
 
             try {
                 string pw = null;
                 string ext = FileHelper.GetFileExtension(fileName);
-                if (ext == ".geds" && !AppHost.StdDialogs.GetPassword(LangMan.LS(LSID.Password), ref pw)) {
-                    AppHost.StdDialogs.ShowError(LangMan.LS(LSID.PasswordIsNotSpecified));
-                    return false;
+                if (ext == ".geds") {
+                    pw = await AppHost.StdDialogs.GetPassword(LangMan.LS(LSID.Password));
+                    if (string.IsNullOrEmpty(pw)) {
+                        AppHost.StdDialogs.ShowError(LangMan.LS(LSID.PasswordIsNotSpecified));
+                        return false;
+                    }
                 }
 
                 FileSave(fileName, pw);
@@ -1485,9 +1581,26 @@ namespace GKCore
             }
         }
 
+        private static string CheckFileName(string fileName)
+        {
+            // Control of possible folder management problems in Windows
+            // if there is a space before the dot in the file name
+            // (the folder cannot be deleted, copied, renamed, moved).
+            string purePath = Path.GetDirectoryName(fileName);
+            string pureFileName = Path.GetFileNameWithoutExtension(fileName);
+            string ext = Path.GetExtension(fileName);
+            if (pureFileName.EndsWith(" ")) {
+                pureFileName = pureFileName.TrimEnd();
+                fileName = Path.Combine(purePath, Path.ChangeExtension(pureFileName, ext));
+            }
+            return fileName;
+        }
+
         private void FileSave(string fileName, string password)
         {
             string oldFileName = fFileName;
+
+            fileName = CheckFileName(fileName);
 
             switch (GlobalOptions.Instance.FileBackup) {
                 case FileBackup.fbNone:
@@ -1726,6 +1839,12 @@ namespace GKCore
 
         #region Modify routines
 
+        public void SetModified()
+        {
+            fTree.Header.TransmissionDateTime = DateTime.Now;
+            Modified = true;
+        }
+
         /// <summary>
         /// This method performs a basic locking of the records for their
         /// editors.
@@ -1763,7 +1882,7 @@ namespace GKCore
 
         #region UI control functions
 
-        public GDMFamilyRecord SelectFamily(IView owner, GDMIndividualRecord target, TargetMode targetMode = TargetMode.tmFamilyChild)
+        public async Task<GDMFamilyRecord> SelectFamily(IView owner, GDMIndividualRecord target, TargetMode targetMode = TargetMode.tmFamilyChild)
         {
             GDMFamilyRecord result;
 
@@ -1771,8 +1890,8 @@ namespace GKCore
                 using (var dlg = AppHost.ResolveDialog<IRecordSelectDialog>(fViewer, GDMRecordType.rtFamily)) {
                     dlg.SetTarget(targetMode, target, GDMSex.svUnknown);
 
-                    if (AppHost.Instance.ShowModalX(dlg, owner, false)) {
-                        result = (dlg.ResultRecord as GDMFamilyRecord);
+                    if (await AppHost.Instance.ShowModalAsync(dlg, owner, false)) {
+                        result = dlg.ResultRecord as GDMFamilyRecord;
                     } else {
                         result = null;
                     }
@@ -1785,7 +1904,7 @@ namespace GKCore
             return result;
         }
 
-        public GDMIndividualRecord SelectPerson(IView owner, GDMIndividualRecord target, TargetMode targetMode, GDMSex needSex)
+        public async Task<GDMIndividualRecord> SelectPerson(IView owner, GDMIndividualRecord target, TargetMode targetMode, GDMSex needSex)
         {
             GDMIndividualRecord result;
 
@@ -1793,8 +1912,8 @@ namespace GKCore
                 using (var dlg = AppHost.ResolveDialog<IRecordSelectDialog>(fViewer, GDMRecordType.rtIndividual)) {
                     dlg.SetTarget(targetMode, target, needSex);
 
-                    if (AppHost.Instance.ShowModalX(dlg, owner, false)) {
-                        result = (dlg.ResultRecord as GDMIndividualRecord);
+                    if (await AppHost.Instance.ShowModalAsync(dlg, owner, false)) {
+                        result = dlg.ResultRecord as GDMIndividualRecord;
                     } else {
                         result = null;
                     }
@@ -1807,7 +1926,7 @@ namespace GKCore
             return result;
         }
 
-        public GDMRecord SelectRecord(IView owner, GDMRecordType mode, params object[] args)
+        public async Task<GDMRecord> SelectRecord(IView owner, GDMRecordType mode, params object[] args)
         {
             GDMRecord result;
 
@@ -1816,7 +1935,7 @@ namespace GKCore
                     var flt = (args != null && args.Length > 0) ? (args[0] as string) : "*";
                     dlg.SetTarget(TargetMode.tmNone, null, GDMSex.svUnknown, flt);
 
-                    if (AppHost.Instance.ShowModalX(dlg, owner, false)) {
+                    if (await AppHost.Instance.ShowModalAsync(dlg, owner, false)) {
                         result = dlg.ResultRecord;
                     } else {
                         result = null;
@@ -1834,7 +1953,7 @@ namespace GKCore
 
         #region Data modification functions
 
-        private GDMFamilyRecord GetFamilyBySpouse(GDMIndividualRecord newParent)
+        private async Task<GDMFamilyRecord> GetFamilyBySpouse(GDMIndividualRecord newParent)
         {
             GDMFamilyRecord result = null;
 
@@ -1848,7 +1967,7 @@ namespace GKCore
                     GDMIndividualRecord wife = fTree.GetPtrValue(fam.Wife);
                     if (husb == newParent || wife == newParent) {
                         string msg = string.Format(LangMan.LS(LSID.ParentsQuery), GKUtils.GetFamilyString(fTree, fam));
-                        if (AppHost.StdDialogs.ShowQuestion(msg)) {
+                        if (await AppHost.StdDialogs.ShowQuestion(msg)) {
                             result = fam;
                             break;
                         }
@@ -1859,7 +1978,7 @@ namespace GKCore
             return result;
         }
 
-        public GDMFamilyRecord GetChildFamily(GDMIndividualRecord iChild, bool canCreate,
+        public async Task<GDMFamilyRecord> GetChildFamily(GDMIndividualRecord iChild, bool canCreate,
                                                  GDMIndividualRecord newParent)
         {
             GDMFamilyRecord result = null;
@@ -1869,7 +1988,7 @@ namespace GKCore
                     result = fTree.GetPtrValue(iChild.ChildToFamilyLinks[0]);
                 } else {
                     if (canCreate) {
-                        GDMFamilyRecord fam = GetFamilyBySpouse(newParent);
+                        GDMFamilyRecord fam = await GetFamilyBySpouse(newParent);
                         if (fam == null) {
                             fam = fTree.CreateFamily();
                         }
@@ -1898,7 +2017,7 @@ namespace GKCore
             return family;
         }
 
-        public GDMIndividualRecord AddChildForParent(IView owner, GDMIndividualRecord parent, GDMSex needSex)
+        public async Task<GDMIndividualRecord> AddChildForParent(IView owner, GDMIndividualRecord parent, GDMSex needSex)
         {
             GDMIndividualRecord resultChild = null;
 
@@ -1906,25 +2025,36 @@ namespace GKCore
                 if (parent.SpouseToFamilyLinks.Count > 1) {
                     AppHost.StdDialogs.ShowError(LangMan.LS(LSID.ThisPersonHasSeveralFamilies));
                 } else {
-                    GDMFamilyRecord family;
-
-                    if (parent.SpouseToFamilyLinks.Count == 0) {
-                        family = AddFamilyForSpouse(parent);
-                        if (family == null) {
-                            return null;
-                        }
-                    } else {
-                        family = fTree.GetPtrValue(parent.SpouseToFamilyLinks[0]);
+                    GDMFamilyRecord family = (parent.SpouseToFamilyLinks.Count == 0) ? null : fTree.GetPtrValue(parent.SpouseToFamilyLinks[0]);
+                    GDMIndividualRecord father = (family == null) ? null : fTree.GetPtrValue(family.Husband);
+                    if (father == null && parent.Sex == GDMSex.svMale) {
+                        father = parent;
                     }
 
-                    GDMIndividualRecord child = SelectPerson(owner, fTree.GetPtrValue(family.Husband), TargetMode.tmParent, needSex);
+                    GDMIndividualRecord child = await SelectPerson(owner, father, TargetMode.tmParent, needSex);
 
-                    if (child != null && family.AddChild(child)) {
-                        // this repetition necessary, because the call of CreatePersonDialog only works if person already has a father,
-                        // what to call AddChild () is no; all this is necessary in order to in the namebook were correct patronymics.
-                        ImportNames(child);
+                    if (child != null) {
+                        if (family == null) {
+                            family = AddFamilyForSpouse(parent);
+                            if (family == null) {
+                                return null;
+                            }
+                        }
 
-                        resultChild = child;
+                        if (family.HasMember(child)) {
+                            AppHost.StdDialogs.ShowAlert(LangMan.LS(LSID.InvalidLink));
+                            return null;
+                        }
+
+                        if (family.AddChild(child)) {
+                            // this repetition necessary, because the call of CreatePersonDialog only works if person already has a father,
+                            // what to call AddChild () is no; all this is necessary in order to in the namebook were correct patronymics.
+                            ImportNames(child);
+
+                            ProcessIndividual(child);
+
+                            resultChild = child;
+                        }
                     }
                 }
             }
@@ -1932,7 +2062,7 @@ namespace GKCore
             return resultChild;
         }
 
-        public GDMIndividualRecord SelectSpouseFor(IView owner, GDMIndividualRecord iRec)
+        public async Task<GDMIndividualRecord> SelectSpouseFor(IView owner, GDMIndividualRecord iRec)
         {
             if (iRec == null)
                 throw new ArgumentNullException(@"iRec");
@@ -1952,7 +2082,7 @@ namespace GKCore
                     return null;
             }
 
-            return SelectPerson(owner, iRec, TargetMode.tmSpouse, needSex);
+            return await SelectPerson(owner, iRec, TargetMode.tmSpouse, needSex);
         }
 
         public void ProcessFamily(GDMFamilyRecord famRec)
@@ -1960,7 +2090,7 @@ namespace GKCore
             if (famRec == null) return;
 
             if (GlobalOptions.Instance.AutoSortChildren) {
-                fTree.SortChilds(famRec);
+                fTree.SortChildren(famRec);
             }
         }
 

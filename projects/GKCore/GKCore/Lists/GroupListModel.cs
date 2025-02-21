@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,12 +18,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GKCore.Design;
 using GKCore.Interfaces;
 using GKCore.Operations;
+using GKCore.Options;
 using GKCore.Types;
 
 namespace GKCore.Lists
@@ -42,13 +43,13 @@ namespace GKCore.Lists
 
 
         public GroupListModel(IBaseContext baseContext) :
-            base(baseContext, CreateGroupListColumns(), GDMRecordType.rtGroup)
+            base(baseContext, CreateListColumns(), GDMRecordType.rtGroup)
         {
         }
 
-        public static ListColumns<GDMGroupRecord> CreateGroupListColumns()
+        public static ListColumns CreateListColumns()
         {
-            var result = new ListColumns<GDMGroupRecord>();
+            var result = new ListColumns(GKListType.rtGroup);
 
             result.AddColumn(LSID.NumberSym, DataType.dtInteger, 50, true);
             result.AddColumn(LSID.Group, DataType.dtString, 400, true, true);
@@ -95,13 +96,20 @@ namespace GKCore.Lists
     {
         private GDMIndividualRecord fMember;
 
-        public GroupMembersListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        public GroupMembersListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raDelete /*, RecordAction.raJump*/);
+        }
 
-            fListColumns.AddColumn(LSID.Name, 300, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stGroupMembers);
+
+            result.AddColumn(LSID.GeneralName, 300, false);
+
+            result.ResetDefaults();
+            return result;
         }
 
         public override void Fetch(GDMIndividualLink aRec)
@@ -124,16 +132,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var grp = fDataOwner as GDMGroupRecord;
-            if (grp == null) return;
-
-            try {
+            if (grp != null)
                 UpdateStructList(grp.Members);
-            } catch (Exception ex) {
-                Logger.WriteError("GroupMembersListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var grp = fDataOwner as GDMGroupRecord;
             if (fBaseWin == null || grp == null) return;
@@ -144,14 +147,19 @@ namespace GKCore.Lists
 
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                    member = fBaseWin.Context.SelectPerson(fOwner, null, TargetMode.tmNone, GDMSex.svUnknown);
+                    member = await fBaseWin.Context.SelectPerson(fOwner, null, TargetMode.tmNone, GDMSex.svUnknown);
                     if (member != null) {
+                        if (grp.IndexOfMember(member) >= 0) {
+                            AppHost.StdDialogs.ShowAlert(LangMan.LS(LSID.InvalidLink));
+                            return;
+                        }
+
                         result = fUndoman.DoOrdinaryOperation(OperationType.otGroupMemberAttach, grp, member);
                     }
                     break;
 
                 case RecordAction.raDelete:
-                    if (member != null && AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachMemberQuery))) {
+                    if (member != null && await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachMemberQuery))) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otGroupMemberDetach, grp, member);
                     }
                     break;

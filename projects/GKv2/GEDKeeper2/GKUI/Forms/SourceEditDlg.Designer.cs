@@ -19,8 +19,11 @@
 		private System.Windows.Forms.TextBox txtTitle;
 		private System.Windows.Forms.Label lblPublication;
 		private System.Windows.Forms.TextBox txtPublication;
+        private System.Windows.Forms.Label lblDate;
+        private Components.GKDateControl dateCtl;
+        private System.Windows.Forms.TabPage pageUserRefs;
 
-		private void InitializeComponent()
+        private void InitializeComponent()
 		{
 		    this.btnAccept = new System.Windows.Forms.Button();
 		    this.btnCancel = new System.Windows.Forms.Button();
@@ -39,7 +42,10 @@
 		    this.pageRepositories = new System.Windows.Forms.TabPage();
 		    this.pageNotes = new System.Windows.Forms.TabPage();
 		    this.pageMultimedia = new System.Windows.Forms.TabPage();
-		    this.tabsData.SuspendLayout();
+            this.lblDate = new System.Windows.Forms.Label();
+            this.dateCtl = new GKUI.Components.GKDateControl();
+            this.pageUserRefs = new System.Windows.Forms.TabPage();
+            this.tabsData.SuspendLayout();
 		    this.pageCommon.SuspendLayout();
 		    this.pageText.SuspendLayout();
 		    this.SuspendLayout();
@@ -74,7 +80,8 @@
 		    this.tabsData.Controls.Add(this.pageRepositories);
 		    this.tabsData.Controls.Add(this.pageNotes);
 		    this.tabsData.Controls.Add(this.pageMultimedia);
-		    this.tabsData.Dock = System.Windows.Forms.DockStyle.Top;
+            this.tabsData.Controls.Add(this.pageUserRefs);
+            this.tabsData.Dock = System.Windows.Forms.DockStyle.Top;
 		    this.tabsData.Location = new System.Drawing.Point(0, 0);
 		    this.tabsData.Name = "tabsData";
 		    this.tabsData.SelectedIndex = 0;
@@ -91,7 +98,9 @@
 		    this.pageCommon.Controls.Add(this.txtAuthor);
 		    this.pageCommon.Controls.Add(this.txtTitle);
 		    this.pageCommon.Controls.Add(this.txtPublication);
-		    this.pageCommon.Location = new System.Drawing.Point(4, 26);
+            this.pageCommon.Controls.Add(this.lblDate);
+            this.pageCommon.Controls.Add(this.dateCtl);
+            this.pageCommon.Location = new System.Drawing.Point(4, 26);
 		    this.pageCommon.Name = "pageCommon";
 		    this.pageCommon.Size = new System.Drawing.Size(744, 457);
 		    this.pageCommon.TabIndex = 0;
@@ -109,7 +118,7 @@
 		    // lblAuthor
 		    // 
 		    this.lblAuthor.AutoSize = true;
-		    this.lblAuthor.Location = new System.Drawing.Point(11, 39);
+		    this.lblAuthor.Location = new System.Drawing.Point(11, 104);
 		    this.lblAuthor.Name = "lblAuthor";
 		    this.lblAuthor.Size = new System.Drawing.Size(62, 17);
 		    this.lblAuthor.TabIndex = 2;
@@ -118,7 +127,7 @@
 		    // lblTitle
 		    // 
 		    this.lblTitle.AutoSize = true;
-		    this.lblTitle.Location = new System.Drawing.Point(11, 175);
+		    this.lblTitle.Location = new System.Drawing.Point(11, 210);
 		    this.lblTitle.Name = "lblTitle";
 		    this.lblTitle.Size = new System.Drawing.Size(44, 17);
 		    this.lblTitle.TabIndex = 4;
@@ -127,7 +136,7 @@
 		    // lblPublication
 		    // 
 		    this.lblPublication.AutoSize = true;
-		    this.lblPublication.Location = new System.Drawing.Point(11, 311);
+		    this.lblPublication.Location = new System.Drawing.Point(11, 316);
 		    this.lblPublication.Name = "lblPublication";
 		    this.lblPublication.Size = new System.Drawing.Size(85, 17);
 		    this.lblPublication.TabIndex = 6;
@@ -137,13 +146,13 @@
 		    // 
 		    this.txtShortTitle.Location = new System.Drawing.Point(157, 10);
 		    this.txtShortTitle.Name = "txtShortTitle";
-		    this.txtShortTitle.Size = new System.Drawing.Size(326, 24);
+		    this.txtShortTitle.Size = new System.Drawing.Size(572, 24);
 		    this.txtShortTitle.TabIndex = 1;
 		    this.txtShortTitle.TextChanged += new System.EventHandler(this.EditShortTitle_TextChanged);
 		    // 
 		    // txtAuthor
 		    // 
-		    this.txtAuthor.Location = new System.Drawing.Point(157, 39);
+		    this.txtAuthor.Location = new System.Drawing.Point(157, 104);
 		    this.txtAuthor.Multiline = true;
 		    this.txtAuthor.Name = "txtAuthor";
 		    this.txtAuthor.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
@@ -152,7 +161,7 @@
 		    // 
 		    // txtTitle
 		    // 
-		    this.txtTitle.Location = new System.Drawing.Point(157, 175);
+		    this.txtTitle.Location = new System.Drawing.Point(157, 210);
 		    this.txtTitle.Multiline = true;
 		    this.txtTitle.Name = "txtTitle";
 		    this.txtTitle.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
@@ -161,16 +170,33 @@
 		    // 
 		    // txtPublication
 		    // 
-		    this.txtPublication.Location = new System.Drawing.Point(157, 311);
+		    this.txtPublication.Location = new System.Drawing.Point(157, 316);
 		    this.txtPublication.Multiline = true;
 		    this.txtPublication.Name = "txtPublication";
 		    this.txtPublication.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
 		    this.txtPublication.Size = new System.Drawing.Size(572, 127);
 		    this.txtPublication.TabIndex = 7;
-		    // 
-		    // pageText
-		    // 
-		    this.pageText.Controls.Add(this.txtText);
+            // 
+            // lblDate
+            // 
+            this.lblDate.AutoSize = true;
+            this.lblDate.Location = new System.Drawing.Point(11, 39);
+            this.lblDate.Name = "lblDate";
+            this.lblDate.Size = new System.Drawing.Size(49, 17);
+            this.lblDate.TabIndex = 10;
+            this.lblDate.Text = "lblDate";
+            // 
+            // dateCtl
+            // 
+            this.dateCtl.Location = new System.Drawing.Point(155, 39);
+            this.dateCtl.Margin = new System.Windows.Forms.Padding(2);
+            this.dateCtl.Name = "dateCtl";
+            this.dateCtl.Size = new System.Drawing.Size(474, 63);
+            this.dateCtl.TabIndex = 10;
+            // 
+            // pageText
+            // 
+            this.pageText.Controls.Add(this.txtText);
 		    this.pageText.Location = new System.Drawing.Point(4, 26);
 		    this.pageText.Name = "pageText";
 		    this.pageText.Size = new System.Drawing.Size(744, 457);
@@ -210,10 +236,19 @@
 		    this.pageMultimedia.Size = new System.Drawing.Size(744, 457);
 		    this.pageMultimedia.TabIndex = 4;
 		    this.pageMultimedia.Text = "pageMultimedia";
-		    // 
-		    // SourceEditDlg
-		    // 
-		    this.AcceptButton = this.btnAccept;
+            // 
+            // pageUserRefs
+            // 
+            this.pageUserRefs.Location = new System.Drawing.Point(4, 22);
+            this.pageUserRefs.Margin = new System.Windows.Forms.Padding(2);
+            this.pageUserRefs.Name = "pageUserRefs";
+            this.pageUserRefs.Size = new System.Drawing.Size(691, 230);
+            this.pageUserRefs.TabIndex = 5;
+            this.pageUserRefs.Text = "pageUserRefs";
+            // 
+            // SourceEditDlg
+            // 
+            this.AcceptButton = this.btnAccept;
 		    this.AutoScaleDimensions = new System.Drawing.SizeF(120F, 120F);
 		    this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
 		    this.CancelButton = this.btnCancel;

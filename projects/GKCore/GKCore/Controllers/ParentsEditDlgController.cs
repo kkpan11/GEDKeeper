@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -24,6 +24,7 @@ using GKCore.Design.Controls;
 using GKCore.Design;
 using GKCore.Design.Views;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -122,38 +123,41 @@ namespace GKCore.Controllers
             }
         }
 
-        public void EditParents()
+        public async void EditParents()
         {
-            GDMFamilyRecord family = fBase.Context.GetChildFamily(fIndividualRecord, false, null);
-            if (family != null && BaseController.ModifyFamily(fView, fBase, ref family, TargetMode.tmNone, null)) {
+            GDMFamilyRecord family = await fBase.Context.GetChildFamily(fIndividualRecord, false, null);
+            if (family != null) {
+                var famRes = await BaseController.ModifyFamily(fView, fBase, family, TargetMode.tmNone, null);
+                if (famRes.Result) {
+                    UpdateControls();
+                }
+            }
+        }
+
+        public async void AddFather()
+        {
+            if (await BaseController.AddIndividualFather(fView, fBase, fLocalUndoman, fIndividualRecord)) {
                 UpdateControls();
             }
         }
 
-        public void AddFather()
+        public async void DeleteFather()
         {
-            if (BaseController.AddIndividualFather(fView, fBase, fLocalUndoman, fIndividualRecord)) {
+            if (await BaseController.DeleteIndividualFather(fBase, fLocalUndoman, fIndividualRecord)) {
                 UpdateControls();
             }
         }
 
-        public void DeleteFather()
+        public async void AddMother()
         {
-            if (BaseController.DeleteIndividualFather(fBase, fLocalUndoman, fIndividualRecord)) {
+            if (await BaseController.AddIndividualMother(fView, fBase, fLocalUndoman, fIndividualRecord)) {
                 UpdateControls();
             }
         }
 
-        public void AddMother()
+        public async void DeleteMother()
         {
-            if (BaseController.AddIndividualMother(fView, fBase, fLocalUndoman, fIndividualRecord)) {
-                UpdateControls();
-            }
-        }
-
-        public void DeleteMother()
-        {
-            if (BaseController.DeleteIndividualMother(fBase, fLocalUndoman, fIndividualRecord)) {
+            if (await BaseController.DeleteIndividualMother(fBase, fLocalUndoman, fIndividualRecord)) {
                 UpdateControls();
             }
         }
@@ -181,7 +185,7 @@ namespace GKCore.Controllers
 
             GetControl<IButton>("btnAccept").Text = LangMan.LS(LSID.DlgAccept);
             GetControl<IButton>("btnCancel").Text = LangMan.LS(LSID.DlgCancel);
-            GetControl<ILabel>("lblChildName").Text = LangMan.LS(LSID.Name);
+            GetControl<ILabel>("lblChildName").Text = LangMan.LS(LSID.GeneralName);
             GetControl<ILabel>("lblParents").Text = LangMan.LS(LSID.Parents);
             GetControl<ILabel>("lblLinkageType").Text = LangMan.LS(LSID.LinkageType);
 
@@ -190,6 +194,22 @@ namespace GKCore.Controllers
             SetToolTip("btnFatherDelete", LangMan.LS(LSID.FatherDeleteTip));
             SetToolTip("btnMotherAdd", LangMan.LS(LSID.MotherAddTip));
             SetToolTip("btnMotherDelete", LangMan.LS(LSID.MotherDeleteTip));
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            GetControl<IButton>("btnParentsEdit").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_ItemEdit, true);
+
+            GetControl<IButton>("btnFatherAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnFatherDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
+
+            GetControl<IButton>("btnMotherAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnMotherDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
         }
     }
 }

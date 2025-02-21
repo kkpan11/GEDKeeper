@@ -4,6 +4,9 @@
     <ItemGroup>
         <Compile Include="SearchManager.cs" />
 
+        <None Include="GKTextSearchPlugin.afr">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKTextSearchPlugin.cze">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
@@ -16,7 +19,13 @@
         <None Include="GKTextSearchPlugin.enu">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Include="GKTextSearchPlugin.fra">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKTextSearchPlugin.hun">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKTextSearchPlugin.jpn">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Include="GKTextSearchPlugin.pol">
@@ -25,7 +34,13 @@
         <None Include="GKTextSearchPlugin.rus">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Include="GKTextSearchPlugin.spa">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKTextSearchPlugin.ukr">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKTextSearchPlugin.zho">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
     </ItemGroup>

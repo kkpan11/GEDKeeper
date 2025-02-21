@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,8 +19,8 @@
  */
 
 using System.Collections.Generic;
-using GKCore.Design.Controls;
 using GKCore.Maps;
+using GKMap;
 
 namespace GKCore.Design.Controls
 {
@@ -29,11 +29,15 @@ namespace GKCore.Design.Controls
     /// </summary>
     public interface IMapBrowser : IBaseControl
     {
+        IMapControl MapControl { get; }
+
         bool ShowPoints { get; set; }
         bool ShowLines { get; set; }
         IList<GeoPoint> MapPoints { get; }
+        PointLatLng TargetPosition { get; set; }
 
         int AddPoint(double latitude, double longitude, string hint);
+        int AddPoint(GeoPoint pt);
         void ClearPoints();
         void DeletePoint(int index);
         void BeginUpdate();

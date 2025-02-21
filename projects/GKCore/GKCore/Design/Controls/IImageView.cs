@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,20 +19,22 @@
  */
 
 using BSLib;
+using GKCore.Controllers;
 using GKCore.Design.Graphics;
-using GKCore.Design.Controls;
+using GKCore.Interfaces;
+using GKUI.Themes;
 
 namespace GKCore.Design.Controls
 {
     /// <summary>
-    /// 
+    /// This control is used only in MediaViewerWin and PortraitSelectDlg.
     /// </summary>
-    public interface IImageView : IBaseControl
+    public interface IImageView : IBaseControl, ILocalizable, IThemedView
     {
         ExtRect SelectionRegion { get; set; }
         bool ShowNamedRegionTips { get; set; }
 
         void AddNamedRegion(string name, ExtRect region);
-        void OpenImage(IImage image);
+        void OpenImage(MediaViewerController controller, IImage image);
     }
 }

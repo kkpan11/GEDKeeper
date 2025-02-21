@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,7 +19,6 @@
  */
 
 using System;
-using System.Collections.Generic;
 using BSLib;
 using GDModel.Providers.GEDCOM;
 using GKCore;
@@ -36,6 +35,8 @@ namespace GDModel
     /// </summary>
     public class GDMDate : GDMCustomDate
     {
+        public static readonly GDMDate Empty = new GDMDate();
+
         public const int UNKNOWN_YEAR = -1;
 
         private GDMApproximated fApproximated;
@@ -113,9 +114,9 @@ namespace GDModel
             fDay = 0;
         }
 
-        public GDMDate(int tagId, string tagValue) : this()
+        public GDMDate(int tagId) : this()
         {
-            SetNameValue(tagId, tagValue);
+            SetName(tagId);
         }
 
         public override void Clear()
@@ -134,7 +135,7 @@ namespace GDModel
         }
 
         /// <summary>
-        /// This function is intended only for checking the completeness of parts of the date 
+        /// This function is intended only for checking the completeness of parts of the date
         /// (year, month and day are defined, are not unknown).
         /// </summary>
         public bool IsValidDate()
@@ -198,7 +199,7 @@ namespace GDModel
         /// <summary>
         /// Internal helper method for parser
         /// </summary>
-        internal void SetRawData(GDMApproximated approximated, GDMCalendar calendar, 
+        internal void SetRawData(GDMApproximated approximated, GDMCalendar calendar,
                                  short year, bool yearBC, string yearModifier, byte month, byte day)
         {
             fApproximated = approximated;
@@ -217,8 +218,7 @@ namespace GDModel
         public static string[] GetMonthNames(GDMCalendar calendar)
         {
             string[] monthes;
-            switch (calendar)
-            {
+            switch (calendar) {
                 case GDMCalendar.dcGregorian:
                 case GDMCalendar.dcJulian:
                 case GDMCalendar.dcRoman:
@@ -265,22 +265,23 @@ namespace GDModel
 
         protected override string GetStringValue()
         {
-            var parts = new List<string>(5);
+            var parts = new string[5];
+            int pIdx = 0;
             if (fApproximated != GDMApproximated.daExact) {
-                parts.Add(GEDCOMConsts.GEDCOMDateApproximatedArray[(int)fApproximated]);
+                parts[pIdx++] = GEDCOMConsts.GEDCOMDateApproximatedArray[(int)fApproximated];
             }
 
             if (fCalendar != GDMCalendar.dcGregorian) {
-                parts.Add(GEDCOMConsts.GEDCOMDateEscapeArray[(int)fCalendar]);
+                parts[pIdx++] = GEDCOMConsts.GEDCOMDateEscapeArray[(int)fCalendar];
             }
 
             if (fDay > 0) {
-                parts.Add(fDay.ToString("D2"));
+                parts[pIdx++] = fDay.ToString("D2");
             }
 
             if (fMonth > 0) {
                 string[] months = GetMonthNames(fCalendar);
-                parts.Add(months[fMonth - 1]);
+                parts[pIdx++] = months[fMonth - 1];
             }
 
             if (fYear != UNKNOWN_YEAR) {
@@ -293,10 +294,10 @@ namespace GDModel
                     yearStr += GEDCOMConsts.YearBC;
                 }
 
-                parts.Add(yearStr);
+                parts[pIdx++] = yearStr;
             }
 
-            return string.Join(" ", parts);
+            return string.Join(" ", parts, 0, pIdx);
         }
 
         private static byte GetMonthNumber(GDMCalendar calendar, string strMonth)
@@ -519,12 +520,13 @@ namespace GDModel
         public static UDN GetUDNByFormattedStr(string dateStr, GDMCalendar calendar, bool aException = false)
         {
             GDMDate dtx = GDMDate.CreateByFormattedStr(dateStr, calendar, aException);
-            return (dtx != null) ? dtx.GetUDN() : UDN.CreateUnknown();
+            return (dtx != null) ? dtx.GetUDN() : UDN.Unknown;
         }
 
         public string GetDisplayString(DateFormat format, bool includeBC = false, bool showCalendar = false)
         {
-            string result = "";
+            var parts = new string[5];
+            int pIdx = 0;
 
             int year = fYear;
             int month = fMonth;
@@ -534,44 +536,39 @@ namespace GDModel
             if (year > 0 || month > 0 || day > 0) {
                 switch (format) {
                     case DateFormat.dfDD_MM_YYYY:
-                        result += day > 0 ? ConvertHelper.AdjustNumber(day, 2) + "." : "__.";
-                        result += month > 0 ? ConvertHelper.AdjustNumber(month, 2) + "." : "__.";
-                        result += year > 0 ? year.ToString().PadLeft(4, '_') : "____";
+                        parts[pIdx++] = day > 0 ? day.ToString("D2", null) + "." : "__.";
+                        parts[pIdx++] = month > 0 ? month.ToString("D2", null) + "." : "__.";
+                        parts[pIdx++] = year > 0 ? year.ToString().PadLeft(4, '_') : "____";
+                        if (includeBC && ybc) {
+                            parts[pIdx++] = " BC";
+                        }
                         break;
 
                     case DateFormat.dfYYYY_MM_DD:
-                        result += year > 0 ? year.ToString().PadLeft(4, '_') + "." : "____.";
-                        result += month > 0 ? ConvertHelper.AdjustNumber(month, 2) + "." : "__.";
-                        result += day > 0 ? ConvertHelper.AdjustNumber(day, 2) : "__";
+                        if (includeBC && ybc) {
+                            parts[pIdx++] = "BC ";
+                        }
+                        parts[pIdx++] = year > 0 ? year.ToString().PadLeft(4, '_') + "." : "____.";
+                        parts[pIdx++] = month > 0 ? month.ToString("D2", null) + "." : "__.";
+                        parts[pIdx++] = day > 0 ? day.ToString("D2", null) : "__";
                         break;
 
                     case DateFormat.dfYYYY:
                         if (year > 0) {
-                            result = year.ToString().PadLeft(4, '_');
+                            if (includeBC && ybc) {
+                                parts[pIdx++] = "BC ";
+                            }
+                            parts[pIdx++] = year.ToString().PadLeft(4, '_');
                         }
                         break;
                 }
-            }
 
-            if (includeBC && ybc) {
-                switch (format) {
-                    case DateFormat.dfDD_MM_YYYY:
-                        result = result + " BC";
-                        break;
-                    case DateFormat.dfYYYY_MM_DD:
-                        result = "BC " + result;
-                        break;
-                    case DateFormat.dfYYYY:
-                        result = "BC " + result;
-                        break;
+                if (showCalendar) {
+                    parts[pIdx] = GKUtils.GetCalendarSign(fCalendar);
                 }
             }
 
-            if (showCalendar) {
-                result = result + GKUtils.GetCalendarSign(fCalendar);
-            }
-
-            return result;
+            return string.Concat(parts);
         }
 
         public override string GetDisplayStringExt(DateFormat format, bool sign, bool showCalendar, bool shorten = false)
@@ -585,5 +582,134 @@ namespace GDModel
         }
 
         #endregion
+
+        public override void GetDateRange(out GDMDate dateStart, out GDMDate dateEnd)
+        {
+            dateStart = this;
+            dateEnd = this;
+        }
+
+        public static GDMDate Increment(GDMDate date)
+        {
+            if (date.IsEmpty()) {
+                return Empty;
+            }
+
+            var calendar = date.fCalendar;
+            var day = date.fDay;
+            var month = date.fMonth;
+            var year = date.fYear;
+            var yearBc = date.fYearBC;
+
+            Increment(ref day, ref month, ref year, ref yearBc, calendar);
+
+            var result = new GDMDate();
+            result.SetRawData(date.fApproximated, calendar, year, yearBc, date.fYearModifier, month, day);
+            return result;
+        }
+
+        private static void Increment(ref byte day, ref byte month, ref short year, ref bool yearBC,
+            GDMCalendar calendar)
+        {
+            if (day > 0) {
+                if (day < DaysInMonth(yearBC, year, month, calendar)) {
+                    day++;
+                    return;
+                }
+
+                day = 1;
+            }
+
+            if (month > 0) {
+                if (month < 12) {
+                    month++;
+                    return;
+                }
+
+                month = 1;
+            }
+
+            if (year == 1 && yearBC) {
+                yearBC = false;
+            } else {
+                year++;
+            }
+        }
+
+        public static GDMDate Decrement(GDMDate date)
+        {
+            if (date.IsEmpty()) {
+                return Empty;
+            }
+
+            var calendar = date.fCalendar;
+            var day = date.fDay;
+            var month = date.fMonth;
+            var year = date.fYear;
+            var yearBc = date.fYearBC;
+
+            Decrement(ref yearBc, ref year, ref month, ref day, calendar);
+
+            var result = new GDMDate();
+            result.SetRawData(date.fApproximated, calendar, year, yearBc, date.fYearModifier, month, day);
+            return result;
+        }
+
+        private static void Decrement(ref bool yearBc, ref short year, ref byte month, ref byte day,
+            GDMCalendar calendar)
+        {
+            if (day > 1) {
+                day--;
+                return;
+            }
+
+            var monthDecremented = month > 1;
+            if (monthDecremented) {
+                month--;
+            } else if (month > 0) {
+                month = 12;
+            }
+
+            if (day > 0) {
+                day = DaysInMonth(yearBc, year, month, calendar);
+            }
+
+            if (monthDecremented) return;
+
+            if (year == 1 && !yearBc) {
+                yearBc = true;
+            } else {
+                year--;
+            }
+        }
+
+        private static byte DaysInMonth(bool yearBC, short year, byte month, GDMCalendar calendar)
+        {
+            if (yearBC) {
+                year -= 1;
+                if (year == 0) {
+                    year = 4; // DateTime.DaysInMonth does not support year 0
+                }
+            }
+
+            if (calendar == GDMCalendar.dcJulian && month == 2 && year % 4 == 0) {
+                return 29;
+            }
+
+            return (byte)DateTime.DaysInMonth(year, month);
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fApproximated);
+            hashCode.Add(fCalendar);
+            hashCode.Add(fDay);
+            hashCode.Add(fMonth);
+            hashCode.Add(fYear);
+            hashCode.Add(fYearBC);
+            hashCode.Add(fYearModifier);
+        }
     }
 }

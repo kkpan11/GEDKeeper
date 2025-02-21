@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -196,6 +196,7 @@ namespace GDModel.Providers.GEDCOM
         {
             Assert.AreEqual(GDMNameType.ntNone, GEDCOMUtils.GetNameTypeVal("unk"));
             Assert.AreEqual(GDMNameType.ntNone, GEDCOMUtils.GetNameTypeVal(GEDCOMUtils.GetNameTypeStr(GDMNameType.ntNone)));
+            Assert.AreEqual(GDMNameType.ntAdoption, GEDCOMUtils.GetNameTypeVal(GEDCOMUtils.GetNameTypeStr(GDMNameType.ntAdoption)));
             Assert.AreEqual(GDMNameType.ntAka, GEDCOMUtils.GetNameTypeVal(GEDCOMUtils.GetNameTypeStr(GDMNameType.ntAka)));
             Assert.AreEqual(GDMNameType.ntBirth, GEDCOMUtils.GetNameTypeVal(GEDCOMUtils.GetNameTypeStr(GDMNameType.ntBirth)));
             Assert.AreEqual(GDMNameType.ntImmigrant, GEDCOMUtils.GetNameTypeVal(GEDCOMUtils.GetNameTypeStr(GDMNameType.ntImmigrant)));
@@ -337,6 +338,8 @@ namespace GDModel.Providers.GEDCOM
             Assert.AreEqual(GDMMultimediaFormat.mfRAR, GEDCOMUtils.GetMultimediaFormatVal(GEDCOMUtils.GetMultimediaFormatStr(GDMMultimediaFormat.mfRAR)));
             Assert.AreEqual(GDMMultimediaFormat.mf7Z, GEDCOMUtils.GetMultimediaFormatVal(GEDCOMUtils.GetMultimediaFormatStr(GDMMultimediaFormat.mf7Z)));
 
+            Assert.AreEqual(GDMMultimediaFormat.mfWEBP, GEDCOMUtils.GetMultimediaFormatVal(GEDCOMUtils.GetMultimediaFormatStr(GDMMultimediaFormat.mfWEBP)));
+
             Assert.AreEqual(GDMMultimediaFormat.mfUnknown, GEDCOMUtils.GetMultimediaFormatVal("xxx"));
         }
 
@@ -400,7 +403,7 @@ namespace GDModel.Providers.GEDCOM
         }
 
         // Line format: <level>_<@xref@>_<tag>_<value> (for test's purpose)
-        private static int ParseTag(string str, out int tagLevel, out string tagXRef, out string tagName, out string tagValue)
+        private static int ParseTag(string str, out int tagLevel, out string tagXRef, out string tagName, out StringSpan tagValue)
         {
             var strTok = new GEDCOMParser(str, false);
             return GEDCOMUtils.ParseTag(strTok, out tagLevel, out tagXRef, out tagName, out tagValue);
@@ -411,14 +414,15 @@ namespace GDModel.Providers.GEDCOM
         {
             string str;
             int tagLevel2, res2;
-            string tagXRef2, tagName2, tagValue2;
+            string tagXRef2, tagName2;
+            StringSpan tagValue2;
 
             str = "0 HEAD";
             res2 = ParseTag(str, out tagLevel2, out tagXRef2, out tagName2, out tagValue2);
             Assert.AreEqual(0, tagLevel2);
             Assert.AreEqual("", tagXRef2);
             Assert.AreEqual("HEAD", tagName2);
-            Assert.AreEqual("", tagValue2);
+            Assert.AreEqual("", (string)tagValue2);
             Assert.AreEqual(2, res2);
 
             str = "0 @SUB1@ SUBM";
@@ -426,7 +430,7 @@ namespace GDModel.Providers.GEDCOM
             Assert.AreEqual(0, tagLevel2);
             Assert.AreEqual("SUB1", tagXRef2);
             Assert.AreEqual("SUBM", tagName2);
-            Assert.AreEqual("", tagValue2);
+            Assert.AreEqual("", (string)tagValue2);
             Assert.AreEqual(3, res2);
 
             str = "0 @SUB1@ SUBM testVal";
@@ -434,7 +438,7 @@ namespace GDModel.Providers.GEDCOM
             Assert.AreEqual(0, tagLevel2);
             Assert.AreEqual("SUB1", tagXRef2);
             Assert.AreEqual("SUBM", tagName2);
-            Assert.AreEqual("testVal", tagValue2);
+            Assert.AreEqual("testVal", (string)tagValue2);
             Assert.AreEqual(4, res2);
 
             str = "1 SUBM @SUB1@";
@@ -442,7 +446,7 @@ namespace GDModel.Providers.GEDCOM
             Assert.AreEqual(1, tagLevel2);
             Assert.AreEqual("", tagXRef2);
             Assert.AreEqual("SUBM", tagName2);
-            Assert.AreEqual("@SUB1@", tagValue2);
+            Assert.AreEqual("@SUB1@", (string)tagValue2);
             Assert.AreEqual(3, res2);
 
             str = "    1 SUBM @SUB1@";
@@ -450,7 +454,7 @@ namespace GDModel.Providers.GEDCOM
             Assert.AreEqual(1, tagLevel2);
             Assert.AreEqual("", tagXRef2);
             Assert.AreEqual("SUBM", tagName2);
-            Assert.AreEqual("@SUB1@", tagValue2);
+            Assert.AreEqual("@SUB1@", (string)tagValue2);
             Assert.AreEqual(3, res2);
 
             str = "2 DATE FROM 20 JAN 1979 TO 15 MAY 2012";
@@ -458,13 +462,13 @@ namespace GDModel.Providers.GEDCOM
             Assert.AreEqual(2, tagLevel2);
             Assert.AreEqual("", tagXRef2);
             Assert.AreEqual(GEDCOMTagName.DATE, tagName2);
-            Assert.AreEqual("FROM 20 JAN 1979 TO 15 MAY 2012", tagValue2);
+            Assert.AreEqual("FROM 20 JAN 1979 TO 15 MAY 2012", (string)tagValue2);
             Assert.AreEqual(3, res2);
 
 
             str = "    test test test (FTB line with error)";
             res2 = ParseTag(str, out tagLevel2, out tagXRef2, out tagName2, out tagValue2);
-            Assert.AreEqual("    test test test (FTB line with error)", tagValue2);
+            Assert.AreEqual("    test test test (FTB line with error)", (string)tagValue2);
             Assert.AreEqual(-1, res2);
 
             str = "        ";
@@ -472,12 +476,29 @@ namespace GDModel.Providers.GEDCOM
             Assert.AreEqual(0, tagLevel2);
             Assert.AreEqual("", tagXRef2);
             Assert.AreEqual("", tagName2);
-            Assert.AreEqual("", tagValue2);
+            Assert.AreEqual("", (string)tagValue2);
             Assert.AreEqual(-2, res2);
 
             str = "";
             res2 = ParseTag(str, out tagLevel2, out tagXRef2, out tagName2, out tagValue2);
             Assert.AreEqual(-2, res2);
+
+            // Leading spaces in CONT lines (fix #551)
+            str = "2 CONT      test leading spaces";
+            res2 = ParseTag(str, out tagLevel2, out tagXRef2, out tagName2, out tagValue2);
+            Assert.AreEqual(2, tagLevel2);
+            Assert.AreEqual("", tagXRef2);
+            Assert.AreEqual(GEDCOMTagName.CONT, tagName2);
+            Assert.AreEqual("     test leading spaces", (string)tagValue2);
+            Assert.AreEqual(3, res2);
+
+            str = "2 CONC      test leading spaces";
+            res2 = ParseTag(str, out tagLevel2, out tagXRef2, out tagName2, out tagValue2);
+            Assert.AreEqual(2, tagLevel2);
+            Assert.AreEqual("", tagXRef2);
+            Assert.AreEqual(GEDCOMTagName.CONC, tagName2);
+            Assert.AreEqual("test leading spaces", (string)tagValue2);
+            Assert.AreEqual(3, res2);
         }
 
         [Test]

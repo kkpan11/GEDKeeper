@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,12 +19,14 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GKCore.Controllers;
 using GKCore.Design;
 using GKCore.Interfaces;
 using GKCore.Operations;
+using GKCore.Options;
 using GKCore.Types;
 
 namespace GKCore.Lists
@@ -33,15 +35,28 @@ namespace GKCore.Lists
     {
         private GDMIndividualRecord fChildRec;
 
-        protected ChildrenListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        protected ChildrenListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
-                RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete, RecordAction.raJump);
+                RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete, RecordAction.raJump, RecordAction.raDetails);
+        }
 
-            fListColumns.AddColumn(LSID.NumberSym, 25, false);
-            fListColumns.AddColumn(LSID.Name, 300, false);
-            fListColumns.AddColumn(LSID.BirthDate, 100, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stChildren);
+
+            result.AddColumn(LSID.NumberSym, 25, false);
+            result.AddColumn(LSID.GeneralName, 300, false);
+            result.AddColumn(LSID.BirthDate, 100, false);
+
+            result.ResetDefaults();
+            return result;
+        }
+
+        protected override GDMRecord GetReferenceRecord(object itemData)
+        {
+            var child = itemData as GDMIndividualLink;
+            return (child == null) ? null : fBaseContext.Tree.GetPtrValue(child);
         }
 
         public override void Fetch(GDMChildLink aRec)
@@ -81,16 +96,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var family = fDataOwner as GDMFamilyRecord;
-            if (family == null) return;
-
-            try {
+            if (family != null)
                 UpdateStructList(family.Children);
-            } catch (Exception ex) {
-                Logger.WriteError("FamilyChildrenListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var family = fDataOwner as GDMFamilyRecord;
             if (fBaseWin == null || family == null) return;
@@ -102,19 +112,26 @@ namespace GKCore.Lists
 
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                    child = fBaseWin.Context.SelectPerson(fOwner, tree.GetPtrValue(family.Husband), TargetMode.tmParent, GDMSex.svUnknown);
-                    result = (child != null && fBaseWin.Context.IsAvailableRecord(child) && !family.HasChild(child));
+                    child = await fBaseWin.Context.SelectPerson(fOwner, tree.GetPtrValue(family.Husband), TargetMode.tmParent, GDMSex.svUnknown);
+                    result = (child != null && fBaseWin.Context.IsAvailableRecord(child));
                     if (result) {
+                        if (family.HasMember(child)) {
+                            AppHost.StdDialogs.ShowAlert(LangMan.LS(LSID.InvalidLink));
+                            return;
+                        }
+
                         result = fUndoman.DoOrdinaryOperation(OperationType.otIndividualParentsAttach, child, family);
                     }
                     break;
 
-                case RecordAction.raEdit:
-                    result = (BaseController.ModifyIndividual(fOwner, fBaseWin, ref child, null, TargetMode.tmNone, GDMSex.svUnknown));
+                case RecordAction.raEdit: {
+                        var indiRes = await BaseController.ModifyIndividual(fOwner, fBaseWin, child, null, TargetMode.tmNone, GDMSex.svUnknown);
+                        result = indiRes.Result;
+                    }
                     break;
 
                 case RecordAction.raDelete:
-                    result = (child != null && AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachChildQuery)));
+                    result = (child != null && await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachChildQuery)));
                     if (result) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otIndividualParentsDetach, child, family);
                     }
@@ -161,7 +178,7 @@ namespace GKCore.Lists
             }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var indiRec = fDataOwner as GDMIndividualRecord;
             if (fBaseWin == null || indiRec == null) return;
@@ -173,23 +190,30 @@ namespace GKCore.Lists
 
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                    GDMFamilyRecord family = fBaseWin.Context.SelectFamily(fOwner, indiRec, TargetMode.tmFamilySpouse);
+                    GDMFamilyRecord family = await fBaseWin.Context.SelectFamily(fOwner, indiRec, TargetMode.tmFamilySpouse);
                     if (family != null && fBaseWin.Context.IsAvailableRecord(family)) {
                         GDMIndividualRecord target = (indiRec.Sex == GDMSex.svMale) ? indiRec : null;
-                        child = fBaseWin.Context.SelectPerson(fOwner, target, TargetMode.tmParent, GDMSex.svUnknown);
+                        child = await fBaseWin.Context.SelectPerson(fOwner, target, TargetMode.tmParent, GDMSex.svUnknown);
                         result = (child != null && fBaseWin.Context.IsAvailableRecord(child));
                         if (result) {
+                            if (family.HasMember(child)) {
+                                AppHost.StdDialogs.ShowAlert(LangMan.LS(LSID.InvalidLink));
+                                return;
+                            }
+
                             result = fUndoman.DoOrdinaryOperation(OperationType.otIndividualParentsAttach, child, family);
                         }
                     }
                     break;
 
-                case RecordAction.raEdit:
-                    result = (BaseController.ModifyIndividual(fOwner, fBaseWin, ref child, null, TargetMode.tmNone, GDMSex.svUnknown));
+                case RecordAction.raEdit: {
+                        var indiRes = await BaseController.ModifyIndividual(fOwner, fBaseWin, child, null, TargetMode.tmNone, GDMSex.svUnknown);
+                        result = indiRes.Result;
+                    }
                     break;
 
                 case RecordAction.raDelete:
-                    result = (child != null && AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachChildQuery)));
+                    result = (child != null && await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachChildQuery)));
                     if (result) {
                         GDMFamilyRecord family2 = tree.FindChildFamily(indiRec, child);
                         result = (family2 != null) && fUndoman.DoOrdinaryOperation(OperationType.otIndividualParentsDetach, child, family2);

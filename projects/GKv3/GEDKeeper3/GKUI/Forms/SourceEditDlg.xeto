@@ -15,22 +15,26 @@
               <TextBox x:Name="txtShortTitle" TextChanged="EditShortTitle_TextChanged" />
             </TableRow>
             <TableRow>
+              <Label x:Name="lblDate" />
+              <comcom:GKDateControl x:Name="dateCtl" />
+            </TableRow>
+            <TableRow>
               <Label x:Name="lblAuthor" />
-              <TextArea x:Name="txtAuthor" />
+              <TextArea x:Name="txtAuthor" AcceptsReturn="True" AcceptsTab="False" />
             </TableRow>
             <TableRow>
               <Label x:Name="lblTitle" />
-              <TextArea x:Name="txtTitle" />
+              <TextArea x:Name="txtTitle" AcceptsReturn="True" AcceptsTab="False" />
             </TableRow>
             <TableRow ScaleHeight="True">
               <Label x:Name="lblPublication" />
-              <TextArea x:Name="txtPublication" />
+              <TextArea x:Name="txtPublication" AcceptsReturn="True" AcceptsTab="False" />
             </TableRow>
           </TableLayout>
         </TabPage>
 
         <TabPage x:Name="pageText">
-          <TextArea x:Name="txtText" />
+          <TextArea x:Name="txtText" AcceptsReturn="True" AcceptsTab="False" />
         </TabPage>
 
         <TabPage x:Name="pageRepositories">
@@ -42,18 +46,17 @@
         <TabPage x:Name="pageMultimedia">
           <comcom:GKSheetList x:Name="fMediaList" />
         </TabPage>
+        <TabPage x:Name="pageUserRefs">
+          <comcom:GKSheetList x:Name="fUserRefList" />
+        </TabPage>
       </TabControl>
     </TableRow>
 
     <TableRow>
-      <StackLayout Spacing="8" Orientation="Horizontal">
+      <StackLayout Style="dlgFooter">
         <StackLayoutItem Expand="True" />
-        <StackLayoutItem HorizontalAlignment="Right">
-          <Button x:Name="btnAccept" Style="dlgBtn" Image="{Resource Resources.btn_accept.gif, GKCore}" Click="AcceptClickHandler" />
-        </StackLayoutItem>
-        <StackLayoutItem HorizontalAlignment="Right">
-          <Button x:Name="btnCancel" Style="dlgBtn" Image="{Resource Resources.btn_cancel.gif, GKCore}" Click="CancelClickHandler" />
-        </StackLayoutItem>
+        <Button x:Name="btnAccept" Style="dlgBtn" Image="{Resource Resources.btn_accept.gif, GKCore}" Click="AcceptClickHandler" />
+        <Button x:Name="btnCancel" Style="dlgBtn" Image="{Resource Resources.btn_cancel.gif, GKCore}" Click="CancelClickHandler" />
       </StackLayout>
     </TableRow>
 

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,6 +19,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using BSLib;
 using GKCore;
 using GKCore.Interfaces;
@@ -31,6 +32,8 @@ namespace GDModel.Providers.GEDCOM
     /// </summary>
     public class GEDCOMChecker
     {
+        private const string EmptyRecordContent = "---";
+
         private readonly IBaseContext fBaseContext;
         private readonly GEDCOMFormat fFormat;
         private readonly IProgressController fProgress;
@@ -40,7 +43,7 @@ namespace GDModel.Providers.GEDCOM
         {
             fBaseContext = baseContext;
             fTree = fBaseContext.Tree;
-            fFormat = GEDCOMProvider.GetGEDCOMFormat(fTree);
+            fFormat = GEDCOMProvider.GetGEDCOMFormat(fTree, out _);
             fProgress = progress;
         }
 
@@ -65,7 +68,7 @@ namespace GDModel.Providers.GEDCOM
 
                 tgtFileRef.LinkFile(srcFileRef.StringValue);
 
-                if (srcFileRef.MultimediaFormat != GDMMultimediaFormat.mfNone) {
+                if (srcFileRef.GetMultimediaFormat() != GDMMultimediaFormat.mfNone) {
                     tgtFileRef.MultimediaFormat = srcFileRef.MultimediaFormat;
                 }
                 if (srcFileRef.MediaType != GDMMediaType.mtUnknown) {
@@ -120,7 +123,7 @@ namespace GDModel.Providers.GEDCOM
                     TransformNote(note);
                 } else {
                     var noteRec = fTree.GetPtrValue<GDMNoteRecord>(note);
-                    if (noteRec == null) tag.Notes.DeleteAt(i);
+                    if (noteRec == null) tag.Notes.RemoveAt(i);
                 }
             }
         }
@@ -135,7 +138,7 @@ namespace GDModel.Providers.GEDCOM
                     TransformSourceCitation(sourCit);
                 } else {
                     var sourRec = fTree.GetPtrValue<GDMSourceRecord>(sourCit);
-                    if (sourRec == null) tag.SourceCitations.DeleteAt(i);
+                    if (sourRec == null) tag.SourceCitations.RemoveAt(i);
                 }
             }
         }
@@ -150,7 +153,7 @@ namespace GDModel.Providers.GEDCOM
                     TransformMultimediaLink(mmLink);
                 } else {
                     var mmRec = fTree.GetPtrValue<GDMMultimediaRecord>(mmLink);
-                    if (mmRec == null) tag.MultimediaLinks.DeleteAt(i);
+                    if (mmRec == null) tag.MultimediaLinks.RemoveAt(i);
                 }
             }
         }
@@ -172,20 +175,19 @@ namespace GDModel.Providers.GEDCOM
             CheckTagWithSourceCitations(swl);
         }
 
-        private void CheckEventPlace(GDMPlace place)
+        private void CheckEventPlace(GDMPlace place, GDMCustomEvent evt)
         {
             GDMPointer placeLocation = place.Location;
             GDMLocationRecord locRec = fTree.GetPtrValue<GDMLocationRecord>(placeLocation);
 
+            // if the pointer is damaged
             if (placeLocation.XRef != "" && locRec == null) {
                 placeLocation.XRef = "";
             }
 
-            if (place.StringValue != "") {
-                if (locRec != null && place.StringValue != locRec.LocationName) {
-                    place.StringValue = locRec.LocationName;
-                }
-            }
+            /*if (place.StringValue != "" && locRec != null) {
+                place.StringValue = GKUtils.GetLocationNameExt(locRec, evt.Date.Value);
+            }*/
 
             CheckTagWithNotes(place);
         }
@@ -195,12 +197,12 @@ namespace GDModel.Providers.GEDCOM
             CheckStructWL(evt);
 
             var tagType = (GEDCOMTagType)evt.Id;
+            string evType = string.IsNullOrEmpty(evt.Classification) ? string.Empty : evt.Classification;
 
             switch (fFormat) {
                 // Fix for Family Tree Maker 2008 which exports occupation as generic EVEN events
-                case GEDCOMFormat.gf_FamilyTreeMaker: {
-                        string subtype = evt.Classification.ToLower();
-                        if (tagType == GEDCOMTagType.EVEN && subtype == "occupation") {
+                case GEDCOMFormat.FamilyTreeMaker: {
+                        if (tagType == GEDCOMTagType.EVEN && evType.ToLower() == "occupation") {
                             evt.SetName(GEDCOMTagType.OCCU);
                             evt.Classification = string.Empty;
                         }
@@ -220,10 +222,11 @@ namespace GDModel.Providers.GEDCOM
             }
 
             if (evt.HasPlace) {
-                CheckEventPlace(evt.Place);
+                CheckEventPlace(evt.Place, evt);
             }
 
-            fBaseContext.EventStats.Increment(evt.GetTagName());
+            string key = evt.GetTagName() + ":" + evType;
+            fBaseContext.EventStats.Increment(key);
         }
 
         private void CheckUserRef(GDMRecord rec, GDMUserReference userRef)
@@ -257,7 +260,7 @@ namespace GDModel.Providers.GEDCOM
             for (int i = iRec.ChildToFamilyLinks.Count - 1; i >= 0; i--) {
                 var cfl = iRec.ChildToFamilyLinks[i];
                 if (fTree.GetPtrValue(cfl) == null) {
-                    iRec.ChildToFamilyLinks.DeleteAt(i);
+                    iRec.ChildToFamilyLinks.RemoveAt(i);
                 } else {
                     CheckPointerWithNotes(cfl);
                 }
@@ -266,7 +269,7 @@ namespace GDModel.Providers.GEDCOM
             for (int i = iRec.SpouseToFamilyLinks.Count - 1; i >= 0; i--) {
                 var sfl = iRec.SpouseToFamilyLinks[i];
                 if (fTree.GetPtrValue(sfl) == null) {
-                    iRec.SpouseToFamilyLinks.DeleteAt(i);
+                    iRec.SpouseToFamilyLinks.RemoveAt(i);
                 } else {
                     CheckPointerWithNotes(sfl);
                 }
@@ -282,13 +285,21 @@ namespace GDModel.Providers.GEDCOM
 
             fBaseContext.ImportNames(iRec);
 
-            if (fFormat == GEDCOMFormat.gf_RootsMagic) {
+            if (fFormat == GEDCOMFormat.RootsMagic) {
                 // _FSFTID -> fsft
                 var fsftTag = FindSubTagValue(iRec, "_FSFTID");
                 if (!string.IsNullOrEmpty(fsftTag)) {
                     iRec.AddTag(new GDMValueTag((int)GEDCOMTagType.RFN, "fsft:" + fsftTag));
                     iRec.DeleteTag("_FSFTID");
                 }
+            }
+
+            // Empty records in files from other programs
+            if (iRec.PersonalNames.Count == 0) {
+                var name = new GDMPersonalName();
+                // when saving protection from skipping
+                name.Given = EmptyRecordContent;
+                iRec.PersonalNames.Add(name);
             }
         }
 
@@ -297,11 +308,11 @@ namespace GDModel.Providers.GEDCOM
             GDMIndividualLink childLink = fam.Children[index];
             var childRec = fTree.GetPtrValue<GDMIndividualRecord>(childLink);
             if (childRec == null) {
-                fam.Children.DeleteAt(index);
+                fam.Children.RemoveAt(index);
                 return;
             }
 
-            if (fFormat == GEDCOMFormat.gf_AGES) {
+            if (fFormat == GEDCOMFormat.AGES) {
                 var frelTag = FindSubTagValue(childLink, "_FREL");
                 var mrelTag = FindSubTagValue(childLink, "_MREL");
                 if (frelTag == "ADOPTED" && mrelTag == "ADOPTED") {
@@ -351,10 +362,10 @@ namespace GDModel.Providers.GEDCOM
             for (int i = group.Members.Count - 1; i >= 0; i--) {
                 GDMIndividualRecord mbr = fTree.GetPtrValue(group.Members[i]);
                 if (mbr == null) {
-                    group.Members.DeleteAt(i);
+                    group.Members.RemoveAt(i);
                 } else {
                     if (mbr.IndexOfGroup(group) < 0) {
-                        group.Members.DeleteAt(i);
+                        group.Members.RemoveAt(i);
                     }
                 }
             }
@@ -365,7 +376,7 @@ namespace GDModel.Providers.GEDCOM
             for (int i = src.RepositoryCitations.Count - 1; i >= 0; i--) {
                 GDMRecord val = fTree.GetPtrValue<GDMRecord>(src.RepositoryCitations[i]);
                 if (val == null) {
-                    src.RepositoryCitations.DeleteAt(i);
+                    src.RepositoryCitations.RemoveAt(i);
                 }
             }
         }
@@ -375,13 +386,13 @@ namespace GDModel.Providers.GEDCOM
             for (int i = 0; i < mmRec.FileReferences.Count; i++) {
                 GDMFileReferenceWithTitle fileRef = mmRec.FileReferences[i];
 
-                GDMMultimediaFormat mmFormat = fileRef.MultimediaFormat;
+                GDMMultimediaFormat mmFormat = fileRef.GetMultimediaFormat();
                 if (mmFormat == GDMMultimediaFormat.mfUnknown || mmFormat == GDMMultimediaFormat.mfNone) {
                     // tag 'FORM' can be corrupted or GEDCOMCore in past not recognize format attempt recovery
-                    fileRef.MultimediaFormat = GDMFileReference.RecognizeFormat(fileRef.StringValue);
+                    fileRef.MultimediaFormat = GDMFileReference.GetMultimediaExt(fileRef.StringValue);
                 }
 
-                if (fFormat == GEDCOMFormat.gf_Native && fileVer == 39) {
+                if (fFormat == GEDCOMFormat.Native && fileVer == 39) {
                     // the transition to normalized names after GKv39
                     // only for not direct references AND not relative references (platform specific paths)
 
@@ -391,6 +402,23 @@ namespace GDModel.Providers.GEDCOM
                         fileRef.StringValue = FileHelper.NormalizeFilename(fileRef.StringValue);
                     }
                 }
+            }
+
+            // Empty records in files from other programs
+            if (mmRec.FileReferences.Count == 0) {
+                var fileRef = new GDMFileReferenceWithTitle();
+                // when saving protection from skipping
+                fileRef.Title = EmptyRecordContent;
+                mmRec.FileReferences.Add(fileRef);
+            }
+        }
+
+        private void CheckNoteRecord(GDMNoteRecord noteRec, int fileVer)
+        {
+            // Empty records in files from other programs
+            if (noteRec.Lines.Count == 0) {
+                // when saving protection from skipping
+                noteRec.Lines.Text = EmptyRecordContent;
             }
         }
 
@@ -427,6 +455,10 @@ namespace GDModel.Providers.GEDCOM
 
                 case GDMRecordType.rtMultimedia:
                     CheckMultimediaRecord(rec as GDMMultimediaRecord, fileVer);
+                    break;
+
+                case GDMRecordType.rtNote:
+                    CheckNoteRecord(rec as GDMNoteRecord, fileVer);
                     break;
             }
         }
@@ -483,7 +515,7 @@ namespace GDModel.Providers.GEDCOM
             try {
                 int fileVer;
                 // remove a deprecated features
-                if (fFormat == GEDCOMFormat.gf_Native) {
+                if (fFormat == GEDCOMFormat.Native) {
                     GDMHeader header = fTree.Header;
                     GDMTag tag;
 
@@ -503,7 +535,7 @@ namespace GDModel.Providers.GEDCOM
 
                 try {
                     bool xrefValid = true;
-                    bool isExtraneous = (fFormat != GEDCOMFormat.gf_Native);
+                    bool isExtraneous = (fFormat != GEDCOMFormat.Native);
 
                     int progress = 0;
                     int num = fTree.RecordsCount;
@@ -550,6 +582,73 @@ namespace GDModel.Providers.GEDCOM
 
             var instance = new GEDCOMChecker(baseContext, pc);
             return instance.CheckFormat();
+        }
+
+
+        private struct LocPair
+        {
+            public GDMLocationRecord Location;
+            public GDMCustomDate Date;
+
+            public LocPair(GDMLocationRecord location, GDMCustomDate date)
+            {
+                Location = location;
+                Date = date;
+            }
+        }
+
+
+        public static void SyncTreeLocations(IBaseContext baseContext, IProgressController pc)
+        {
+            if (baseContext == null)
+                throw new ArgumentNullException("baseContext");
+
+            if (pc == null)
+                throw new ArgumentNullException("pc");
+
+            try {
+                var tree = baseContext.Tree;
+                pc.Begin(LangMan.LS(LSID.FormatCheck), 100);
+
+                try {
+                    var cache = new Dictionary<LocPair, string>();
+
+                    int progress = 0;
+                    int num = tree.RecordsCount;
+                    for (int i = 0; i < num; i++) {
+                        GDMRecord rec = tree[i];
+                        if (rec.RecordType != GDMRecordType.rtIndividual && rec.RecordType != GDMRecordType.rtFamily) continue;
+
+                        var rwe = rec as GDMRecordWithEvents;
+                        if (!rwe.HasEvents) continue;
+
+                        for (int k = 0, num2 = rwe.Events.Count; k < num2; k++) {
+                            GDMCustomEvent evt = rwe.Events[k];
+                            if (!evt.HasPlace) continue;
+
+                            GDMLocationRecord locRec = tree.GetPtrValue<GDMLocationRecord>(evt.Place.Location);
+                            if (locRec != null) {
+                                var pair = new LocPair(locRec, evt.Date.Value);
+                                if (!cache.TryGetValue(pair, out string locName)) {
+                                    locName = GKUtils.GetLocationNameExt(locRec, evt.Date.Value);
+                                    cache.Add(pair, locName);
+                                }
+                                evt.Place.StringValue = locName;
+                            }
+                        }
+
+                        int newProgress = (int)Math.Min(100, ((i + 1) * 100.0f) / num);
+                        if (progress != newProgress) {
+                            progress = newProgress;
+                            pc.StepTo(progress);
+                        }
+                    }
+                } finally {
+                    pc.End();
+                }
+            } catch (Exception ex) {
+                Logger.WriteError("GEDCOMChecker.SyncTreeLocations()", ex);
+            }
         }
     }
 }

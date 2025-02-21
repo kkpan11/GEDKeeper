@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,13 +18,14 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GKCore.Controllers;
 using GKCore.Design;
 using GKCore.Interfaces;
 using GKCore.Operations;
+using GKCore.Options;
 using GKCore.Types;
 
 namespace GKCore.Lists
@@ -33,19 +34,32 @@ namespace GKCore.Lists
     {
         private GDMSourceRecord fSourceRec;
 
-        public SourceCitationsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        public SourceCitationsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete,
                 RecordAction.raMoveUp, RecordAction.raMoveDown,
-                RecordAction.raCopy, RecordAction.raPaste);
+                RecordAction.raCopy, RecordAction.raPaste, RecordAction.raDetails);
+        }
 
-            fListColumns.AddColumn(LSID.NumberSym, 25, false);
-            fListColumns.AddColumn(LSID.Title, 260, false);
-            fListColumns.AddColumn(LSID.Page, 80, false);
-            fListColumns.AddColumn(LSID.Certainty, 220, false);
-            fListColumns.AddColumn(LSID.Author, 70, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stSourceCitations);
+
+            result.AddColumn(LSID.NumberSym, 25, false);
+            result.AddColumn(LSID.Title, 260, false);
+            result.AddColumn(LSID.Page, 90, false);
+            result.AddColumn(LSID.Certainty, 220, false);
+            result.AddColumn(LSID.Author, 70, false);
+
+            result.ResetDefaults();
+            return result;
+        }
+
+        protected override GDMRecord GetReferenceRecord(object itemData)
+        {
+            var srcCit = itemData as GDMSourceCitation;
+            return (srcCit == null) ? null : fBaseContext.Tree.GetPtrValue<GDMSourceRecord>(srcCit);
         }
 
         public override void Fetch(GDMSourceCitation aRec)
@@ -71,7 +85,7 @@ namespace GKCore.Lists
                     result = LangMan.LS(GKData.CertaintyAssessments[fFetchedRec.GetValidCertaintyAssessment()]);
                     break;
                 case 4:
-                    result = fSourceRec.Originator.Lines.Text.Trim();
+                    result = GKUtils.MergeStrings(fSourceRec.Originator.Lines);
                     break;
             }
             return result;
@@ -80,16 +94,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var dataOwner = fDataOwner as IGDMStructWithSourceCitations;
-            if (dataOwner == null) return;
-
-            try {
+            if (dataOwner != null)
                 UpdateStructList(dataOwner.SourceCitations);
-            } catch (Exception ex) {
-                Logger.WriteError("SourceCitationsListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var dataOwner = fDataOwner as IGDMStructWithSourceCitations;
             if (fBaseWin == null || dataOwner == null) return;
@@ -100,31 +109,22 @@ namespace GKCore.Lists
 
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                case RecordAction.raEdit:
-                    result = BaseController.ModifySourceCitation(fOwner, fBaseWin, fUndoman, dataOwner, ref srcCit);
+                case RecordAction.raEdit: {
+                        var srcCitRes = await BaseController.ModifySourceCitation(fOwner, fBaseWin, fUndoman, dataOwner, srcCit);
+                        srcCit = srcCitRes.Record;
+                        result = srcCitRes.Result;
+                    }
                     break;
 
                 case RecordAction.raDelete:
-                    if (AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachSourceQuery))) {
+                    if (await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachSourceQuery))) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otRecordSourceCitRemove, fDataOwner, srcCit);
                     }
                     break;
 
                 case RecordAction.raMoveUp:
                 case RecordAction.raMoveDown:
-                    {
-                        int idx = dataOwner.SourceCitations.IndexOf(srcCit);
-                        switch (eArgs.Action) {
-                            case RecordAction.raMoveUp:
-                                dataOwner.SourceCitations.Exchange(idx - 1, idx);
-                                break;
-
-                            case RecordAction.raMoveDown:
-                                dataOwner.SourceCitations.Exchange(idx, idx + 1);
-                                break;
-                        }
-                        result = true;
-                    }
+                    result = dataOwner.SourceCitations.Exchange(srcCit, eArgs.Action);
                     break;
 
                 case RecordAction.raCopy:

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -43,6 +43,8 @@ namespace GKUI.Forms
 
         private List<GKComboItem<GfxBorderStyle>> fBorderItems;
         private List<GKComboItem<int>> fGenItems;
+        private List<GKComboItem<TreeChartKind>> fModes;
+
 
         public IWindow OwnerWindow
         {
@@ -58,27 +60,10 @@ namespace GKUI.Forms
 
         #endregion
 
-        /*
-    <Form.ToolBar>
-        <ToolBar TextAlign="Right" Style="tbsi">
-            <complat:GKDropDownToolItem x:Name="tbModes">
-                <complat:GKDropDownToolItem.ContextMenu>
-                    <ContextMenu x:Name="MenuModes">
-                    </ContextMenu>
-                </complat:GKDropDownToolItem.ContextMenu>
-            </complat:GKDropDownToolItem>
-        </ToolBar>
-    </Form.ToolBar>
-         */
-
         public TreeChartWin(IBaseWindow baseWin)
         {
             InitializeComponent();
             InitializeComponentEx();
-
-            /*miModeBoth.Tag = TreeChartKind.ckBoth;
-            miModeAncestors.Tag = TreeChartKind.ckAncestors;
-            miModeDescendants.Tag = TreeChartKind.ckDescendants;*/
 
             fTreeBox = new TreeChartBox(new XFGfxRenderer());
             fTreeBox.Base = baseWin;
@@ -100,6 +85,10 @@ namespace GKUI.Forms
             miXRefVisible.Checked = fTreeBox.Options.XRefVisible;
             fTreeBox.XRefVisible = fTreeBox.Options.XRefVisible;
 
+            miTrackSelectedLines.Checked = fTreeBox.Options.TrackSelectedLines;
+
+            miTrackMatchedSources.Checked = fTreeBox.Options.TrackMatchedSources;
+
             miTraceSelected.Checked = fTreeBox.Options.TraceSelected;
             fTreeBox.TraceSelected = fTreeBox.Options.TraceSelected;
 
@@ -116,15 +105,7 @@ namespace GKUI.Forms
 
         private void InitializeComponentEx()
         {
-            /*miModeBoth = new RadioMenuItem();
-            miModeBoth.Click += miModeItem_Click;
-
-            miModeAncestors = new RadioMenuItem(miModeBoth);
-            miModeAncestors.Click += miModeItem_Click;
-
-            miModeDescendants = new RadioMenuItem(miModeBoth);
-            miModeDescendants.Click += miModeItem_Click;
-
+            /*
             miHideDescSpouses = new CheckMenuItem();
             miHideDescSpouses.Click += miHideDescSpouses_Click;
 
@@ -147,94 +128,20 @@ namespace GKUI.Forms
             miFillImage.Click += miFillImage_Click;
 
             MenuModes.Items.AddRange(new MenuItem[] {
-                                         miModeBoth,
-                                         miModeAncestors,
-                                         miModeDescendants,
-                                         new SeparatorMenuItem(),
                                          miHideDescSpouses,
-                                         new SeparatorMenuItem(),
                                          miTraceSelected,
                                          miTraceKinships,
                                          miCertaintyIndex,
                                          miXRefVisible,
-                                         new SeparatorMenuItem(),
                                          miFillColor,
-                                         miFillImage,
-                                         new SeparatorMenuItem()});
-
-            miEdit = new ButtonMenuItem();
-            miEdit.Click += miEdit_Click;
-
-            miFatherAdd = new ButtonMenuItem();
-            miFatherAdd.Click += miFatherAdd_Click;
-
-            miMotherAdd = new ButtonMenuItem();
-            miMotherAdd.Click += miMotherAdd_Click;
-
-            miFamilyAdd = new ButtonMenuItem();
-            miFamilyAdd.Click += miFamilyAdd_Click;
-
-            miSpouseAdd = new ButtonMenuItem();
-            miSpouseAdd.Click += miSpouseAdd_Click;
-
-            miSonAdd = new ButtonMenuItem();
-            miSonAdd.Click += miSonAdd_Click;
-
-            miDaughterAdd = new ButtonMenuItem();
-            miDaughterAdd.Click += miDaughterAdd_Click;
-
-            miDelete = new ButtonMenuItem();
-            miDelete.Click += miDelete_Click;
-
-            miRebuildTree = new ButtonMenuItem();
-            miRebuildTree.Click += miRebuildTree_Click;
-
-            miRebuildKinships = new ButtonMenuItem();
-            miRebuildKinships.Click += miRebuildKinships_Click;
-
-            miSelectColor = new ButtonMenuItem();
-            miSelectColor.Click += miSelectColor_Click;
-
-            miGoToRecord = new ButtonMenuItem();
-            miGoToRecord.Click += miGoToRecord_Click;
-
-            miGoToPrimaryBranch = new ButtonMenuItem();
-            miGoToPrimaryBranch.Click += miGoToPrimaryBranch_Click;
-
-            miOpenInNewWindow = new ButtonMenuItem();
-            miOpenInNewWindow.Click += miOpenInNewWindow_Click;
-
-            miMergeDuplicates = new ButtonMenuItem();
-            miMergeDuplicates.Click += miMergeDuplicates_Click;
-
-            MenuPerson = new ContextMenu();
-            MenuPerson.Items.AddRange(new MenuItem[] {
-                                          miEdit,
-                                          new SeparatorMenuItem(),
-                                          miFatherAdd,
-                                          miMotherAdd,
-                                          miFamilyAdd,
-                                          miSpouseAdd,
-                                          miSonAdd,
-                                          miDaughterAdd,
-                                          new SeparatorMenuItem(),
-                                          miDelete,
-                                          new SeparatorMenuItem(),
-                                          miGoToRecord,
-                                          miGoToPrimaryBranch,
-                                          miOpenInNewWindow,
-                                          miMergeDuplicates,
-                                          new SeparatorMenuItem(),
-                                          miRebuildTree,
-                                          miRebuildKinships,
-                                          new SeparatorMenuItem(),
-                                          miSelectColor});
-            MenuPerson.Opening += MenuPerson_Opening;*/
+                                         miFillImage});
+            */
         }
 
         protected override void OnAppearing()
         {
             base.OnAppearing();
+
             fTreeBox.Focus();
             UpdateControls();
         }
@@ -266,45 +173,8 @@ namespace GKUI.Forms
 
         private void UpdateModesMenu()
         {
-            /*miModeBoth.Checked = false;
-            miModeAncestors.Checked = false;
-            miModeDescendants.Checked = false;
-
-            switch (fTreeBox.Model.Kind) {
-                case TreeChartKind.ckAncestors:
-                    miModeAncestors.Checked = true;
-                    break;
-
-                case TreeChartKind.ckDescendants:
-                    miModeDescendants.Checked = true;
-                    break;
-
-                case TreeChartKind.ckBoth:
-                    miModeBoth.Checked = true;
-                    break;
-            }*/
+            // not used
         }
-
-        /*private void TreeChartWin_KeyDown(object sender, KeyEventArgs e)
-        {
-            switch (e.Key) {
-                case Keys.F5:
-                    GenChart();
-                    break;
-
-                case Keys.F:
-                    if (e.Control) {
-                        QuickSearch();
-                    }
-                    break;
-
-                case Keys.S:
-                    if (e.Control) {
-                        fController.Base.SaveFileEx(false);
-                    }
-                    break;
-            }
-        }*/
 
         private void tbImageSave_Click(object sender, EventArgs e)
         {
@@ -351,8 +221,13 @@ namespace GKUI.Forms
 
             fBorderItems = new List<GKComboItem<GfxBorderStyle>>();
             for (var bs = GfxBorderStyle.None; bs <= GfxBorderStyle.Last; bs++) {
-                fBorderItems.Add(new GKComboItem<GfxBorderStyle>(bs.ToString(), bs));
+                fBorderItems.Add(new GKComboItem<GfxBorderStyle>(LangMan.LS(BorderPainter.StyleNames[(int)bs]), bs));
             }
+
+            fModes = new List<GKComboItem<TreeChartKind>>();
+            fModes.Add(new GKComboItem<TreeChartKind>(LangMan.LS(LSID.TM_Both), TreeChartKind.ckBoth));
+            fModes.Add(new GKComboItem<TreeChartKind>(LangMan.LS(LSID.TM_Ancestors), TreeChartKind.ckAncestors));
+            fModes.Add(new GKComboItem<TreeChartKind>(LangMan.LS(LSID.TM_Descendants), TreeChartKind.ckDescendants));
         }
 
         private async void miGensX_Click(object sender, EventArgs e)
@@ -388,15 +263,6 @@ namespace GKUI.Forms
             var treeOptions = GlobalOptions.Instance.TreeChartOptions;
 
             fController.SetupDepth();
-
-            /*if (!treeOptions.SeparateDepth) {
-                UIHelper.SetMenuItemTag(MenuGensCommon, treeOptions.DepthLimit);
-            } else {
-                UIHelper.SetMenuItemTag(MenuGensAncestors, treeOptions.DepthLimitAncestors);
-                UIHelper.SetMenuItemTag(MenuGensDescendants, treeOptions.DepthLimitDescendants);
-            }
-
-            UIHelper.SetMenuItemTag(MenuBorders, (int)GlobalOptions.Instance.TreeChartOptions.BorderStyle);*/
         }
 
         private async void miBorderX_Click(object sender, EventArgs e)
@@ -504,12 +370,12 @@ namespace GKUI.Forms
             fTreeBox.Invalidate();*/
         }
 
-        private void miModeItem_Click(object sender, EventArgs e)
+        private async void miModeItem_Click(object sender, EventArgs e)
         {
-            /*TreeChartKind newMode = (TreeChartKind)((RadioMenuItem)sender).Tag;
-            if (fTreeBox.Model.Kind == newMode) return;
-
-            GenChart(fPerson, newMode);*/
+            var modeItem = await UIHelper.SelectItem(this, fModes);
+            if (modeItem != null && fTreeBox.Model.Kind != modeItem.Tag) {
+                GenChart(fPerson, modeItem.Tag);
+            }
         }
 
         private void miRebuildTree_Click(object sender, EventArgs e)

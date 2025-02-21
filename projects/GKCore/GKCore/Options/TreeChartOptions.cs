@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -33,8 +33,11 @@ namespace GKCore.Options
     /// </summary>
     public sealed class TreeChartOptions : IOptions
     {
-        public static readonly int MALE_COLOR = -3750145; // FFC6C6FF
-        public static readonly int FEMALE_COLOR = -14650; // FFFFC6C6
+        //public static readonly int MALE_COLOR = -3750145; // FFC6C6FF
+        //public static readonly int FEMALE_COLOR = -14650; // FFFFC6C6
+
+        public static readonly int MALE_COLOR = -3223042; // FFCED1FE
+        public static readonly int FEMALE_COLOR = -12328; // FFFFCFD8
         public static readonly int UNK_SEX_COLOR = -14593; // FFFFC6FF
         public static readonly int UN_HUSBAND_COLOR = -2631681; // FFD7D7FF
         public static readonly int UN_WIFE_COLOR = -10281; // FFFFD7D7
@@ -61,6 +64,7 @@ namespace GKCore.Options
         public bool ShowPlaces;
         public bool HideUnknownSpouses;
         public bool DottedLinesOfAdoptedChildren;
+        public bool DottedLinesOfCommonLawSpouses;
         public bool SeparateDatesAndPlacesLines;
         public bool BoldNames;
         public bool OnlyLocality;
@@ -72,6 +76,13 @@ namespace GKCore.Options
         public bool ShortenDateRanges;
         public bool SameCardsWidth;
         public bool HideDescSpouses; // without option's load/save
+        public bool TrackSelectedLines;
+        public bool TrackMatchedSources;
+        public bool FullNameOnOneLine;
+        public bool ParentAges;
+        public bool DateDesignations;
+        public bool MourningEdges;
+        public bool UseAdditionalDates;
 
         public IColor MaleColor;
         public IColor FemaleColor;
@@ -83,11 +94,13 @@ namespace GKCore.Options
         public int DefFontSize;
         public IColor DefFontColor;
         public BSDTypes.FontStyle DefFontStyle;
+        public TextEffect TextEffect;
 
         public int BranchDistance;
         public int LevelDistance;
         public int Margins;
         public int SpouseDistance;
+        public int Padding;
 
         public bool SeparateDepth { get; set; }
         public int DepthLimit { get; set; }
@@ -130,6 +143,7 @@ namespace GKCore.Options
             ShowPlaces = false;
             HideUnknownSpouses = false;
             DottedLinesOfAdoptedChildren = false;
+            DottedLinesOfCommonLawSpouses = false;
             SeparateDatesAndPlacesLines = false;
             BoldNames = false;
             OnlyLocality = false;
@@ -141,6 +155,9 @@ namespace GKCore.Options
             ShortenDateRanges = false;
             SameCardsWidth = false;
             HideDescSpouses = false;
+            TrackSelectedLines = true;
+            TrackMatchedSources = false;
+            FullNameOnOneLine = false;
 
             MaleColor = ChartRenderer.GetColor(MALE_COLOR);
             FemaleColor = ChartRenderer.GetColor(FEMALE_COLOR);
@@ -149,14 +166,16 @@ namespace GKCore.Options
             UnWifeColor = ChartRenderer.GetColor(UN_WIFE_COLOR);
 
             DefFontName = AppHost.GfxProvider.GetDefaultFontName();
-            DefFontSize = 8;
+            DefFontSize = (int)AppHost.GfxProvider.GetDefaultFontSize();
             DefFontColor = ChartRenderer.GetColor(BSDColors.Black);
             DefFontStyle = BSDTypes.FontStyle.None;
+            TextEffect = TextEffect.Simple;
 
             BranchDistance = TreeChartModel.DEF_BRANCH_DISTANCE;
             LevelDistance = TreeChartModel.DEF_LEVEL_DISTANCE;
             Margins = TreeChartModel.DEF_MARGINS;
             SpouseDistance = TreeChartModel.DEF_SPOUSE_DISTANCE;
+            Padding = TreeChartModel.DEF_PERSON_NODE_PADDING;
 
             SeparateDepth = false;
             DepthLimit = -1;
@@ -166,6 +185,10 @@ namespace GKCore.Options
             UseExtraControls = true;
             UseInlineImagesInSvg = true;
             ExtendedTree = false;
+            ParentAges = false;
+            DateDesignations = true;
+            MourningEdges = true;
+            UseAdditionalDates = false;
         }
 
         public void Assign(IOptions source)
@@ -190,20 +213,25 @@ namespace GKCore.Options
             TraceSelected = srcOptions.TraceSelected;
             ChildlessExclude = srcOptions.ChildlessExclude;
             Decorative = srcOptions.Decorative;
+
             MaleColor = srcOptions.MaleColor;
             FemaleColor = srcOptions.FemaleColor;
             UnkSexColor = srcOptions.UnkSexColor;
             UnHusbandColor = srcOptions.UnHusbandColor;
             UnWifeColor = srcOptions.UnWifeColor;
+
             DefFontName = srcOptions.DefFontName;
             DefFontSize = srcOptions.DefFontSize;
             DefFontColor = srcOptions.DefFontColor;
             DefFontStyle = srcOptions.DefFontStyle;
+            TextEffect = srcOptions.TextEffect;
+
             InvertedTree = srcOptions.InvertedTree;
             MarriagesDates = srcOptions.MarriagesDates;
             ShowPlaces = srcOptions.ShowPlaces;
             HideUnknownSpouses = srcOptions.HideUnknownSpouses;
             DottedLinesOfAdoptedChildren = srcOptions.DottedLinesOfAdoptedChildren;
+            DottedLinesOfCommonLawSpouses = srcOptions.DottedLinesOfCommonLawSpouses;
             SeparateDatesAndPlacesLines = srcOptions.SeparateDatesAndPlacesLines;
             BoldNames = srcOptions.BoldNames;
             SeparateDepth = srcOptions.SeparateDepth;
@@ -216,15 +244,23 @@ namespace GKCore.Options
             ShortenDateRanges = srcOptions.ShortenDateRanges;
             SameCardsWidth = srcOptions.SameCardsWidth;
             HideDescSpouses = srcOptions.HideDescSpouses;
+            TrackSelectedLines = srcOptions.TrackSelectedLines;
+            TrackMatchedSources = srcOptions.TrackMatchedSources;
+            FullNameOnOneLine = srcOptions.FullNameOnOneLine;
 
             BranchDistance = srcOptions.BranchDistance;
             LevelDistance = srcOptions.LevelDistance;
             Margins = srcOptions.Margins;
             SpouseDistance = srcOptions.SpouseDistance;
+            Padding = srcOptions.Padding;
 
             UseExtraControls = srcOptions.UseExtraControls;
             UseInlineImagesInSvg = srcOptions.UseInlineImagesInSvg;
             ExtendedTree = srcOptions.ExtendedTree;
+            ParentAges = srcOptions.ParentAges;
+            DateDesignations = srcOptions.DateDesignations;
+            MourningEdges = srcOptions.MourningEdges;
+            UseAdditionalDates = srcOptions.UseAdditionalDates;
         }
 
         public void LoadFromFile(IniFile iniFile)
@@ -255,6 +291,7 @@ namespace GKCore.Options
             ShowPlaces = iniFile.ReadBool("Chart", "ShowPlaces", false);
             HideUnknownSpouses = iniFile.ReadBool("Chart", "HideUnknownSpouses", false);
             DottedLinesOfAdoptedChildren = iniFile.ReadBool("Chart", "DottedLinesOfAdoptedChildren", false);
+            DottedLinesOfCommonLawSpouses = iniFile.ReadBool("Chart", "DottedLinesOfCommonLawSpouses", false);
             SeparateDatesAndPlacesLines = iniFile.ReadBool("Chart", "SeparateDatesAndPlacesLines", false);
             BoldNames = iniFile.ReadBool("Chart", "BoldNames", false);
             BorderStyle = (GfxBorderStyle)iniFile.ReadInteger("Chart", "BorderStyle", 0);
@@ -273,14 +310,16 @@ namespace GKCore.Options
             UnWifeColor = ChartRenderer.GetColor(iniFile.ReadInteger("Chart", "UnWifeColor", UN_WIFE_COLOR));
 
             DefFontName = iniFile.ReadString("Chart", "FontName", AppHost.GfxProvider.GetDefaultFontName());
-            DefFontSize = iniFile.ReadInteger("Chart", "FontSize", 8);
+            DefFontSize = iniFile.ReadInteger("Chart", "FontSize", (int)AppHost.GfxProvider.GetDefaultFontSize());
             DefFontColor = ChartRenderer.GetColor(iniFile.ReadInteger("Chart", "FontColor", BSDColors.Black));
             DefFontStyle = (BSDTypes.FontStyle)iniFile.ReadInteger("Chart", "FontStyle", 0);
+            TextEffect = (TextEffect)iniFile.ReadInteger("Chart", "TextEffect", 0);
 
             BranchDistance = iniFile.ReadInteger("Chart", "BranchDistance", TreeChartModel.DEF_BRANCH_DISTANCE);
             LevelDistance = iniFile.ReadInteger("Chart", "LevelDistance", TreeChartModel.DEF_LEVEL_DISTANCE);
             Margins = iniFile.ReadInteger("Chart", "Margins", TreeChartModel.DEF_MARGINS);
             SpouseDistance = iniFile.ReadInteger("Chart", "SpouseDistance", TreeChartModel.DEF_SPOUSE_DISTANCE);
+            Padding = iniFile.ReadInteger("Chart", "Padding", TreeChartModel.DEF_PERSON_NODE_PADDING);
 
             SeparateDepth = iniFile.ReadBool("Chart", "SeparateDepth", false);
             DepthLimit = iniFile.ReadInteger("Chart", "DepthLimit", -1);
@@ -291,6 +330,14 @@ namespace GKCore.Options
             UseInlineImagesInSvg = iniFile.ReadBool("Chart", "UseInlineImagesInSvg", true);
             ExtendedTree = iniFile.ReadBool("Chart", "ExtendedTree", false);
             XRefVisible = iniFile.ReadBool("Chart", "XRefVisible", false);
+            TrackSelectedLines = iniFile.ReadBool("Chart", "TrackSelectedLines", true);
+            TrackMatchedSources = iniFile.ReadBool("Chart", "TrackMatchedSources", false);
+            FullNameOnOneLine = iniFile.ReadBool("Chart", "FullNameOnOneLine", false);
+
+            ParentAges = iniFile.ReadBool("Chart", "ParentAges", false);
+            DateDesignations = iniFile.ReadBool("Chart", "DateDesignations", true);
+            MourningEdges = iniFile.ReadBool("Chart", "MourningEdges", true);
+            UseAdditionalDates = iniFile.ReadBool("Chart", "UseAdditionalDates", false);
         }
 
         public void SaveToFile(IniFile iniFile)
@@ -321,6 +368,7 @@ namespace GKCore.Options
             iniFile.WriteBool("Chart", "ShowPlaces", ShowPlaces);
             iniFile.WriteBool("Chart", "HideUnknownSpouses", HideUnknownSpouses);
             iniFile.WriteBool("Chart", "DottedLinesOfAdoptedChildren", DottedLinesOfAdoptedChildren);
+            iniFile.WriteBool("Chart", "DottedLinesOfCommonLawSpouses", DottedLinesOfCommonLawSpouses);
             iniFile.WriteBool("Chart", "SeparateDatesAndPlacesLines", SeparateDatesAndPlacesLines);
             iniFile.WriteBool("Chart", "BoldNames", BoldNames);
             iniFile.WriteInteger("Chart", "BorderStyle", (int)BorderStyle);
@@ -342,11 +390,13 @@ namespace GKCore.Options
             iniFile.WriteInteger("Chart", "FontSize", DefFontSize);
             iniFile.WriteInteger("Chart", "FontColor", DefFontColor.ToArgb());
             iniFile.WriteInteger("Chart", "FontStyle", (byte)DefFontStyle);
+            iniFile.WriteInteger("Chart", "TextEffect", (byte)TextEffect);
 
             iniFile.WriteInteger("Chart", "BranchDistance", BranchDistance);
             iniFile.WriteInteger("Chart", "LevelDistance", LevelDistance);
             iniFile.WriteInteger("Chart", "Margins", Margins);
             iniFile.WriteInteger("Chart", "SpouseDistance", SpouseDistance);
+            iniFile.WriteInteger("Chart", "Padding", Padding);
 
             iniFile.WriteBool("Chart", "SeparateDepth", SeparateDepth);
             iniFile.WriteInteger("Chart", "DepthLimit", DepthLimit);
@@ -357,6 +407,14 @@ namespace GKCore.Options
             iniFile.WriteBool("Chart", "UseInlineImagesInSvg", UseInlineImagesInSvg);
             iniFile.WriteBool("Chart", "ExtendedTree", ExtendedTree);
             iniFile.WriteBool("Chart", "XRefVisible", XRefVisible);
+            iniFile.WriteBool("Chart", "TrackSelectedLines", TrackSelectedLines);
+            iniFile.WriteBool("Chart", "TrackMatchedSources", TrackMatchedSources);
+            iniFile.WriteBool("Chart", "FullNameOnOneLine", FullNameOnOneLine);
+
+            iniFile.WriteBool("Chart", "ParentAges", ParentAges);
+            iniFile.WriteBool("Chart", "DateDesignations", DateDesignations);
+            iniFile.WriteBool("Chart", "MourningEdges", MourningEdges);
+            iniFile.WriteBool("Chart", "UseAdditionalDates", UseAdditionalDates);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,13 +18,14 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GKCore.Controllers;
 using GKCore.Design;
 using GKCore.Interfaces;
 using GKCore.Operations;
+using GKCore.Options;
 using GKCore.Types;
 
 namespace GKCore.Lists
@@ -33,16 +34,23 @@ namespace GKCore.Lists
     {
         private GDMFileReferenceWithTitle fFileRef;
 
-        public MediaLinksListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        public MediaLinksListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete,
                 RecordAction.raMoveUp, RecordAction.raMoveDown);
+        }
 
-            fListColumns.AddColumn(LSID.NumberSym, 25, false);
-            fListColumns.AddColumn(LSID.RPMultimedia, 300, false);
-            fListColumns.AddColumn(LSID.Type, 300, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stMediaLinks);
+
+            result.AddColumn(LSID.NumberSym, 25, false);
+            result.AddColumn(LSID.RPMultimedia, 300, false);
+            result.AddColumn(LSID.Type, 300, false);
+
+            result.ResetDefaults();
+            return result;
         }
 
         public override void Fetch(GDMMultimediaLink aRec)
@@ -73,16 +81,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var dataOwner = fDataOwner as IGDMStructWithMultimediaLinks;
-            if (dataOwner == null) return;
-
-            try {
+            if (dataOwner != null)
                 UpdateStructList(dataOwner.MultimediaLinks);
-            } catch (Exception ex) {
-                Logger.WriteError("MediaLinksListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var dataOwner = fDataOwner as IGDMStructWithMultimediaLinks;
             if (fBaseWin == null || dataOwner == null) return;
@@ -94,13 +97,13 @@ namespace GKCore.Lists
             GDMMultimediaRecord mmRec;
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                    mmRec = fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtMultimedia, new object[0]) as GDMMultimediaRecord;
+                    mmRec = await fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtMultimedia, new object[0]) as GDMMultimediaRecord;
                     if (mmRec != null) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otRecordMediaAdd, (GDMObject)dataOwner, mmRec);
                         mmLink = dataOwner.FindMultimediaLink(mmRec);
 
                         if (result && mmLink != null && (dataOwner is GDMIndividualRecord) && GKUtils.MayContainPortrait(mmRec)) {
-                            BaseController.SelectPortraitRegion(fOwner, fBaseWin, mmLink);
+                            await BaseController.SelectPortraitRegion(fOwner, fBaseWin, mmLink);
                         }
                     }
                     break;
@@ -108,31 +111,20 @@ namespace GKCore.Lists
                 case RecordAction.raEdit:
                     if (mmLink != null) {
                         mmRec = fBaseContext.Tree.GetPtrValue<GDMMultimediaRecord>(mmLink);
-                        result = BaseController.ModifyMedia(fOwner, fBaseWin, ref mmRec);
+                        var mmRes = await BaseController.ModifyMedia(fOwner, fBaseWin, mmRec);
+                        result = mmRes.Result;
                     }
                     break;
 
                 case RecordAction.raDelete:
-                    if (AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachMultimediaQuery))) {
+                    if (await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachMultimediaQuery))) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otRecordMediaRemove, (GDMObject)dataOwner, mmLink);
                     }
                     break;
 
                 case RecordAction.raMoveUp:
                 case RecordAction.raMoveDown:
-                    {
-                        int idx = dataOwner.MultimediaLinks.IndexOf(mmLink);
-                        switch (eArgs.Action) {
-                            case RecordAction.raMoveUp:
-                                dataOwner.MultimediaLinks.Exchange(idx - 1, idx);
-                                break;
-
-                            case RecordAction.raMoveDown:
-                                dataOwner.MultimediaLinks.Exchange(idx, idx + 1);
-                                break;
-                        }
-                        result = true;
-                    }
+                    result = dataOwner.MultimediaLinks.Exchange(mmLink, eArgs.Action);
                     break;
             }
 

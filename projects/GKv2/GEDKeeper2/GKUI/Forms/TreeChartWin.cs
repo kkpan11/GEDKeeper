@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -107,6 +107,12 @@ namespace GKUI.Forms
             miXRefVisible.Checked = fTreeBox.Options.XRefVisible;
             fTreeBox.XRefVisible = fTreeBox.Options.XRefVisible;
 
+            miTrackSelectedLines.Checked = fTreeBox.Options.TrackSelectedLines;
+
+            miTrackMatchedSources.Checked = fTreeBox.Options.TrackMatchedSources;
+
+            miParentAges.Checked = fTreeBox.Options.ParentAges;
+
             miTraceSelected.Checked = fTreeBox.Options.TraceSelected;
             fTreeBox.TraceSelected = fTreeBox.Options.TraceSelected;
 
@@ -133,8 +139,7 @@ namespace GKUI.Forms
         {
             base.OnLoad(e);
 
-            if (GlobalOptions.Instance.MaximizeChartWindows)
-                this.WindowState = FormWindowState.Maximized;
+            AppHost.Instance.SetWindowBounds(this, GlobalOptions.Instance.ChartWindowsShowMode);
 
             fTreeBox.Select();
             UpdateControls();
@@ -273,7 +278,8 @@ namespace GKUI.Forms
             }
 
             for (var bs = GfxBorderStyle.None; bs <= GfxBorderStyle.Last; bs++) {
-                UIHelper.AddToolStripItem(MenuBorders, bs.ToString(), (int)bs, miBorderX_Click);
+                int bsIdx = (int)bs;
+                UIHelper.AddToolStripItem(MenuBorders, LangMan.LS(BorderPainter.StyleNames[bsIdx]), bsIdx, miBorderX_Click);
             }
         }
 
@@ -367,6 +373,21 @@ namespace GKUI.Forms
             fTreeBox.RebuildKinships();
         }
 
+        private void miMapAncestors_Click(object sender, EventArgs e)
+        {
+            fController.ShowMapAncestors();
+        }
+
+        private void miMapDescendants_Click(object sender, EventArgs e)
+        {
+            fController.ShowMapDescendants();
+        }
+
+        private void miMapAll_Click(object sender, EventArgs e)
+        {
+            fController.ShowMapAll();
+        }
+
         private void miTraceSelected_Click(object sender, EventArgs e)
         {
             miTraceSelected.Checked = !miTraceSelected.Checked;
@@ -404,6 +425,31 @@ namespace GKUI.Forms
             fTreeBox.XRefVisible = miXRefVisible.Checked;
         }
 
+        private void miTrackSelectedLines_Click(object sender, EventArgs e)
+        {
+            miTrackSelectedLines.Checked = !miTrackSelectedLines.Checked;
+            fTreeBox.Options.TrackSelectedLines = miTrackSelectedLines.Checked;
+            fTreeBox.Invalidate();
+        }
+
+        private void miTrackMatchedSources_Click(object sender, EventArgs e)
+        {
+            miTrackMatchedSources.Checked = !miTrackMatchedSources.Checked;
+            fTreeBox.Options.TrackMatchedSources = miTrackMatchedSources.Checked;
+            fTreeBox.Invalidate();
+        }
+
+        private void miParentAges_Click(object sender, EventArgs e)
+        {
+            miParentAges.Checked = !miParentAges.Checked;
+            fTreeBox.Options.ParentAges = miParentAges.Checked;
+            if (fTreeBox.Options.ParentAges) {
+                GenChart();
+            } else {
+                fTreeBox.Invalidate();
+            }
+        }
+
         private void miFillColor_Click(object sender, EventArgs e)
         {
             using (var colorDialog1 = new ColorDialog()) {
@@ -415,9 +461,9 @@ namespace GKUI.Forms
             }
         }
 
-        private void miFillImage_Click(object sender, EventArgs e)
+        private async void miFillImage_Click(object sender, EventArgs e)
         {
-            string fileName = AppHost.StdDialogs.GetOpenFile("", GKUtils.GetBackgroundsPath(), LangMan.LS(LSID.ImagesFilter), 1, "");
+            string fileName = await AppHost.StdDialogs.GetOpenFile("", GKUtils.GetBackgroundsPath(), LangMan.LS(LSID.ImagesFilter), 1, "");
             if (string.IsNullOrEmpty(fileName)) return;
 
             Image img = new Bitmap(fileName);

@@ -1,10 +1,10 @@
 @echo off
 
-set APP_VER=3.4.1
+set APP_VER=3.8.0
 
 call ..\clean.cmd
 
-dotnet build ../projects/GKv3/GEDKeeper3.sln -c MSWin_Release
+dotnet build ../projects/GKv3/GEDKeeper3.sln /p:Configuration=Release /p:Platform=MSWin64
 
 set BUILD_STATUS=%ERRORLEVEL%
 if %BUILD_STATUS%==0 goto installer

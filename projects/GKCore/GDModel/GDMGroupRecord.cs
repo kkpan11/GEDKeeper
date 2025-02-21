@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -126,11 +126,11 @@ namespace GDModel
         {
             if (member == null) return false;
 
-            GDMIndividualLink mbrLink = new GDMIndividualLink((int)GEDCOMTagType._MEMBER, string.Empty);
+            GDMIndividualLink mbrLink = new GDMIndividualLink((int)GEDCOMTagType._MEMBER);
             mbrLink.XRef = member.XRef;
             fMembers.Add(mbrLink);
 
-            var ptr = new GDMPointer((int)GEDCOMTagType._GROUP, string.Empty);
+            var ptr = new GDMPointer((int)GEDCOMTagType._GROUP);
             ptr.XRef = this.XRef;
             member.Groups.Add(ptr);
 
@@ -141,8 +141,8 @@ namespace GDModel
         {
             if (member == null) return false;
 
-            fMembers.DeleteAt(IndexOfMember(member));
-            member.Groups.DeleteAt(member.IndexOfGroup(this));
+            fMembers.RemoveAt(IndexOfMember(member));
+            member.Groups.RemoveAt(member.IndexOfGroup(this));
 
             return true;
         }
@@ -159,6 +159,14 @@ namespace GDModel
                 var obj = fMembers.Extract(0);
                 targetGroup.Members.Add(obj);
             }
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fGroupName);
+            ProcessHashes(ref hashCode, fMembers);
         }
     }
 }

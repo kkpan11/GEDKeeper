@@ -105,7 +105,7 @@ namespace GKCore
         [Test]
         public void Test_ListColumn()
         {
-            var colStatic = new ListColumn(0, 0, DataType.dtString, 0, true);
+            var colStatic = new ListColumn(0, "", DataType.dtString, 0, true);
             Assert.IsNotNull(colStatic);
             Assert.AreEqual(0, colStatic.Order);
             Assert.AreEqual(false, colStatic.CurActive);
@@ -164,13 +164,13 @@ namespace GKCore
             IListFilter filter = listManager.Filter;
             IListColumns listColumns = listManager.ListColumns;
 
-            var copyColumns = GroupListModel.CreateGroupListColumns();
+            var copyColumns = GroupListModel.CreateListColumns();
             listColumns.CopyTo(copyColumns);
 
             Assert.Throws(typeof(ArgumentNullException), () => { listColumns.CopyTo(null); });
 
             listManager.QuickFilter.Value = "*";
-            listManager.AddCondition((byte)GroupListModel.ColumnType.ctName, ConditionKind.ck_Contains, "*roup*");
+            listManager.AddCondition((byte)GroupListModel.ColumnType.ctName, ConditionKind.ck_ContainsMask, "*roup*");
             Assert.IsTrue(listManager.CheckFilter());
         }
 
@@ -273,7 +273,7 @@ namespace GKCore
 
             listManager.QuickFilter.Value = "*";
             Assert.IsTrue(listManager.CheckFilter());
-            listManager.QuickFilter.Value = "*locat*";
+            listManager.QuickFilter.Value = "*Locat*";
             Assert.IsTrue(listManager.CheckFilter());
             listManager.QuickFilter.Value = "*xxxx*";
             Assert.IsFalse(listManager.CheckFilter());

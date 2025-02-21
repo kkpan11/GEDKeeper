@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2017 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih, burtek.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -27,6 +27,29 @@ namespace GKCore.Cultures
     {
         public PolishCulture()
         {
+        }
+
+        public override string NormalizeSurname(string sn, bool aFemale)
+        {
+            if (string.IsNullOrEmpty(sn) || (sn[0] == '(' && sn[sn.Length - 1] == ')'))
+            {
+                sn = "?";
+            }
+            else
+            {
+                if (aFemale)
+                {
+                    sn = GetMaidenSurname(sn);
+
+                    if (sn.EndsWith("nа")) {
+                        sn = sn.Substring(0, sn.Length - 1) + "y";
+                    } else if (sn.EndsWith("ska") || sn.EndsWith("cka") || sn.EndsWith("dzka")) {
+                        sn = sn.Substring(0, sn.Length - 1) + "i";
+                    }
+                }
+            }
+
+            return sn;
         }
     }
 }

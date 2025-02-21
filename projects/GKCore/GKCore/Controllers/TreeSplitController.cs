@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -22,12 +22,13 @@ using System.Collections.Generic;
 using System.IO;
 using GDModel;
 using GDModel.Providers.GEDCOM;
-using GKCore.Design.Controls;
 using GKCore.Design;
+using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Options;
 using GKCore.Tools;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -36,6 +37,7 @@ namespace GKCore.Controllers
     /// </summary>
     public class TreeSplitController : DialogController<ITreeSplitDlg>
     {
+        private bool fIndiMode;
         private readonly List<GDMRecord> fSplitList;
 
         public TreeSplitController(ITreeSplitDlg view) : base(view)
@@ -55,13 +57,21 @@ namespace GKCore.Controllers
                 int num = tree.RecordsCount;
                 for (int i = 0; i < num; i++) {
                     GDMRecord rec = tree[i];
-                    if (rec is GDMIndividualRecord) {
+                    if (fIndiMode && rec is GDMIndividualRecord) {
                         cnt++;
                         GDMIndividualRecord iRec = rec as GDMIndividualRecord;
                         string st = iRec.XRef + " / " + GKUtils.GetNameString(iRec, false);
 
                         if (fSplitList.IndexOf(iRec) < 0) {
                             fView.SkippedList.AddItem(null, st);
+                        } else {
+                            fView.SelectedList.AddItem(null, st);
+                        }
+                    } else {
+                        string st = rec.XRef + " / " + GKUtils.GetRecordName(tree, rec, false);
+
+                        if (fSplitList.IndexOf(rec) < 0) {
+                            //fView.SkippedList.AddItem(null, st);
                         } else {
                             fView.SelectedList.AddItem(null, st);
                         }
@@ -76,6 +86,7 @@ namespace GKCore.Controllers
 
         public void Select(TreeTools.TreeWalkMode walkMode)
         {
+            fIndiMode = true;
             Select(fBase.GetSelectedPerson(), walkMode);
         }
 
@@ -92,7 +103,18 @@ namespace GKCore.Controllers
             UpdateView();
         }
 
-        public void Delete()
+        public void SelectList()
+        {
+            fIndiMode = false;
+
+            fSplitList.Clear();
+            var baseList = fBase.GetContentList(fBase.GetSelectedRecordType());
+            fSplitList.AddRange(baseList);
+
+            UpdateView();
+        }
+
+        public async void Delete()
         {
             int num = fSplitList.Count;
             if (num == 0) return;
@@ -101,7 +123,7 @@ namespace GKCore.Controllers
                 object obj = fSplitList[i];
 
                 if (obj is GDMIndividualRecord) {
-                    BaseController.DeleteRecord(fBase, obj as GDMIndividualRecord, false);
+                    await BaseController.DeleteRecord(fBase, obj as GDMIndividualRecord, false);
                 }
             }
 
@@ -112,9 +134,9 @@ namespace GKCore.Controllers
             AppHost.StdDialogs.ShowMessage(LangMan.LS(LSID.RecsDeleted));
         }
 
-        public void Save()
+        public async void Save()
         {
-            string fileName = AppHost.StdDialogs.GetSaveFile("", "", LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT, "");
+            string fileName = await AppHost.StdDialogs.GetSaveFile("", "", LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT, "");
             if (string.IsNullOrEmpty(fileName)) return;
 
             TreeTools.CheckRelations(fBase.Context.Tree, fSplitList);
@@ -130,21 +152,29 @@ namespace GKCore.Controllers
 
         public override void SetLocale()
         {
-            fView.Title = LangMan.LS(LSID.ToolOp_3);
+            fView.Title = LangMan.LS(LSID.TreeSplit);
 
             if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
-                GetControl<ITabPage>("pageTreeSplit").Text = LangMan.LS(LSID.ToolOp_3);
+                GetControl<ITabPage>("pageTreeSplit").Text = LangMan.LS(LSID.TreeSplit);
                 GetControl<IButton>("btnClose").Text = LangMan.LS(LSID.DlgClose);
             }
             GetControl<IButton>("btnSelectAll").Text = LangMan.LS(LSID.SelAll);
             GetControl<IButton>("btnSelectFamily").Text = LangMan.LS(LSID.SelFamily);
             GetControl<IButton>("btnSelectAncestors").Text = LangMan.LS(LSID.SelAncestors);
             GetControl<IButton>("btnSelectDescendants").Text = LangMan.LS(LSID.SelDescendants);
+            GetControl<IButton>("btnSelectList").Text = LangMan.LS(LSID.SelList);
             GetControl<IButton>("btnDelete").Text = LangMan.LS(LSID.DoDelete);
             GetControl<IButton>("btnSave").Text = LangMan.LS(LSID.MIFileSaveAs);
 
-            fView.SelectedList.AddColumn(LangMan.LS(LSID.Person), 300, false);
-            fView.SkippedList.AddColumn(LangMan.LS(LSID.Person), 300, false);
+            fView.SelectedList.AddColumn(LangMan.LS(LSID.Record), 300, false);
+            fView.SkippedList.AddColumn(LangMan.LS(LSID.Record), 300, false);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnClose").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

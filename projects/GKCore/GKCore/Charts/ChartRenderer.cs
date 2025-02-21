@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -47,6 +47,17 @@ namespace GKCore.Charts
         SVG
     }
 
+    public enum TextEffect
+    {
+        Simple,
+        Sunken,
+        Raised,
+        Glow,
+
+        First = Simple,
+        Last = Glow
+    }
+
     /// <summary>
     /// 
     /// </summary>
@@ -61,7 +72,17 @@ namespace GKCore.Charts
         {
         }
 
-        public abstract void SetSmoothing(bool value);
+        public virtual void SetViewport(int width, int height)
+        {
+        }
+
+        public virtual void SetSmoothing(bool value)
+        {
+        }
+
+        public virtual void SetTranslucent(float value)
+        {
+        }
 
         public virtual void BeginDrawing()
         {
@@ -71,14 +92,13 @@ namespace GKCore.Charts
         {
         }
 
+        public abstract void SetTarget(object target);
+
 
         public static IColor GetColor(int argb)
         {
             return AppHost.GfxProvider.CreateColor(argb);
         }
-
-
-        public abstract void SetTarget(object target);
 
         /// <summary>
         /// A separate implementation only for those cases when different classes
@@ -95,7 +115,7 @@ namespace GKCore.Charts
         /// </summary>
         public virtual IImage LoadResourceImage(Type baseType, string resName)
         {
-            return AppHost.GfxProvider.LoadResourceImage(baseType, resName);
+            return AppHost.GfxProvider.LoadResourceImage(baseType, resName, ImageTarget.Chart);
         }
 
         /// <summary>
@@ -104,7 +124,7 @@ namespace GKCore.Charts
         /// </summary>
         public virtual IImage LoadResourceImage(string resName, bool makeTransp = false)
         {
-            return AppHost.GfxProvider.LoadResourceImage(resName, makeTransp);
+            return AppHost.GfxProvider.LoadResourceImage(resName, ImageTarget.Chart, makeTransp);
         }
 
         public void DrawImage(IImage image, float x, float y, string imName)
@@ -133,6 +153,11 @@ namespace GKCore.Charts
 
         public abstract void DrawString(string text, IFont font, IBrush brush, float x, float y);
 
+        public virtual void DrawString(string text, IFont font, IBrush brush, float x, float y, TextEffect effect = TextEffect.Simple)
+        {
+            DrawString(text, font, brush, x, y);
+        }
+
         public virtual void DrawAnchor(string text, string anchor, IFont font, IBrush brush, float x, float y)
         {
             // Not applicable for most areas except exports
@@ -156,7 +181,17 @@ namespace GKCore.Charts
         public abstract void DrawRoundedRectangle(IPen pen, IColor fillColor, float x, float y,
                                                   float width, float height, float radius);
 
+        public virtual void DrawCoverGlass(float x, float y, float width, float height, float radius)
+        {
+            // dummy
+        }
+
         public abstract void DrawPath(IPen pen, IBrush brush, IGfxPath path);
+
+        public virtual IFont CreateFont(string fontName, float size, bool bold)
+        {
+            return AppHost.GfxProvider.CreateFont(fontName, size, bold);
+        }
 
         public IPen CreatePen(int argb, float width = 1.0f)
         {
@@ -169,8 +204,6 @@ namespace GKCore.Charts
 
         public abstract IGfxPath CreateCirclePath(float x, float y, float width, float height);
         public abstract IGfxPath CreateCircleSegmentPath(int ctX, int ctY, float inRad, float extRad, float wedgeAngle, float ang1, float ang2);
-
-        public abstract void SetTranslucent(float value);
 
         public abstract void ScaleTransform(float sx, float sy);
         public abstract void TranslateTransform(float dx, float dy);

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -20,11 +20,13 @@
 
 #define GEDML_SUPPORT
 #define FAMX_SUPPORT
+//#define GDZ_SUPPORT
 
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GKCore.Charts;
@@ -122,20 +124,20 @@ namespace GKCore.Controllers
             fContext.Modified = false;
         }
 
-        public void NewFile()
+        public async void NewFile()
         {
             if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
-                AppHost.Instance.CreateBase("");
+                await AppHost.Instance.CreateBase("");
             } else {
                 CreateNewFile();
             }
         }
 
-        public void LoadFile(string fileName)
+        public async void LoadFile(string fileName)
         {
             Clear();
 
-            if (fContext.FileLoad(fileName)) {
+            if (await fContext.FileLoad(fileName)) {
                 fContext.Modified = false;
                 ChangeFileName();
                 RefreshLists(false);
@@ -156,40 +158,33 @@ namespace GKCore.Controllers
 #if FAMX_SUPPORT
             filters += "|" + "Family.Show files (*.familyx)|*.familyx";
 #endif
+
+#if GDZ_SUPPORT
+            filters += "|" + "GEDZIP files (*.gdz,*.zip)|*.gdz,*.zip";
+#endif
         }
 
-        public void LoadFileEx()
+        public async Task LoadFileEx()
         {
             string homePath, filters;
             PrepareLoadFile(out homePath, out filters);
 
-            string fileName = AppHost.StdDialogs.GetOpenFile("", homePath, filters, 1, GKData.GEDCOM_EXT);
+            string fileName = await AppHost.StdDialogs.GetOpenFile("", homePath, filters, 1, GKData.GEDCOM_EXT);
             if (!string.IsNullOrEmpty(fileName)) {
-                AppHost.Instance.LoadBase(fView, fileName);
+                await AppHost.Instance.LoadBase(fView, fileName);
             }
         }
 
-        public async void LoadFileAsync()
+        public async void SaveFile(string fileName)
         {
-            string homePath, filters;
-            PrepareLoadFile(out homePath, out filters);
-
-            string fileName = await AppHost.StdDialogs.GetOpenFileAsync("", homePath, filters, 1, GKData.GEDCOM_EXT);
-            if (!string.IsNullOrEmpty(fileName)) {
-                AppHost.Instance.LoadBase(fView, fileName);
-            }
-        }
-
-        public void SaveFile(string fileName)
-        {
-            if (fContext.FileSave(fileName)) {
+            if (await fContext.FileSave(fileName)) {
                 fContext.Modified = false;
                 ChangeFileName();
                 AppHost.Instance.BaseSaved(fView, fileName);
             }
         }
 
-        public void SaveFileEx(bool saveAs)
+        public async void SaveFileEx(bool saveAs)
         {
             string oldFileName = fContext.FileName;
             bool isUnknown = fContext.IsUnknown();
@@ -198,7 +193,27 @@ namespace GKCore.Controllers
                 SaveFile(oldFileName);
             } else {
                 string homePath = AppHost.Instance.GetUserFilesPath(Path.GetDirectoryName(oldFileName));
-                string newFileName = AppHost.StdDialogs.GetSaveFile("", homePath, LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT, oldFileName, GlobalOptions.Instance.FilesOverwriteWarn);
+                string proposedFileName = Path.GetFileName(oldFileName);
+                string newFileName = await AppHost.StdDialogs.GetSaveFile("", homePath, LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT, proposedFileName, GlobalOptions.Instance.FilesOverwriteWarn);
+                if (!string.IsNullOrEmpty(newFileName)) {
+                    SaveFile(newFileName);
+                    if (!isUnknown && !string.Equals(oldFileName, newFileName)) {
+                        AppHost.Instance.BaseRenamed(fView, oldFileName, newFileName);
+                    }
+                }
+            }
+        }
+
+        public async void SaveFileAsync(bool saveAs)
+        {
+            string oldFileName = fContext.FileName;
+            bool isUnknown = fContext.IsUnknown();
+
+            if (!isUnknown && !saveAs) {
+                SaveFile(oldFileName);
+            } else {
+                string homePath = AppHost.Instance.GetUserFilesPath(Path.GetDirectoryName(oldFileName));
+                string newFileName = await AppHost.StdDialogs.GetSaveFile("", homePath, LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT, oldFileName, GlobalOptions.Instance.FilesOverwriteWarn);
                 if (!string.IsNullOrEmpty(newFileName)) {
                     SaveFile(newFileName);
                     if (!isUnknown && !string.Equals(oldFileName, newFileName)) {
@@ -251,17 +266,13 @@ namespace GKCore.Controllers
         {
             if (record == null) return;
 
-            DateTime dtNow = DateTime.Now;
-
             switch (action) {
                 case RecordAction.raAdd:
                 case RecordAction.raEdit:
-                    record.ChangeDate.ChangeDateTime = dtNow;
                     CheckChangedRecord(record, true);
                     break;
 
-                case RecordAction.raDelete:
-                    {
+                case RecordAction.raDelete: {
                         CheckChangedRecord(record, false);
 
                         IListView rView = GetRecordsViewByType(record.RecordType);
@@ -284,42 +295,44 @@ namespace GKCore.Controllers
                     break;
             }
 
-            if (action != RecordAction.raJump) {
-                fContext.Tree.Header.TransmissionDateTime = dtNow;
-                fContext.Modified = true;
+            BaseController.NotifyRecord(fView, record, action);
+        }
 
-                AppHost.Instance.NotifyRecord(fView, record, action);
+        public void MoveMediaFiles(IList<object> items, MediaStoreType storeType)
+        {
+            try {
+                fContext.BeginUpdate();
+
+                for (int i = 0; i < items.Count; i++) {
+                    var mmRec = items[i] as GDMMultimediaRecord;
+                    if (mmRec == null) continue;
+
+                    bool res = fContext.MoveMediaFile(mmRec, storeType);
+                    if (res) NotifyRecord(mmRec, RecordAction.raEdit);
+                }
+            } finally {
+                fContext.EndUpdate();
+
+                RefreshRecordsView(GDMRecordType.rtMultimedia);
             }
         }
 
         public void DuplicateRecord()
         {
             GDMRecord original = GetSelectedRecordEx();
-            if (original == null || original.RecordType != GDMRecordType.rtIndividual) return;
-
-            AppHost.StdDialogs.ShowWarning(LangMan.LS(LSID.DuplicateWarning));
-
-            GDMIndividualRecord target;
-            try {
-                fContext.BeginUpdate();
-
-                target = fContext.Tree.CreateIndividual();
-                target.Assign(original);
-
+            GDMRecord target = BaseController.DuplicateRecord(fContext, original);
+            if (target != null) {
                 NotifyRecord(target, RecordAction.raAdd);
-            } finally {
-                fContext.EndUpdate();
+                RefreshLists(false);
+                SelectRecordByXRef(target.XRef);
             }
-
-            RefreshLists(false);
-            fView.SelectRecordByXRef(target.XRef);
         }
 
-        public void AddRecord()
+        public async void AddRecord()
         {
             GDMRecordType rt = GetSelectedRecordType();
 
-            GDMRecord record = BaseController.AddRecord(fView, fView, rt, null);
+            GDMRecord record = await BaseController.AddRecord(fView, fView, rt, null);
             if (record != null) {
                 RefreshLists(false);
             }
@@ -327,20 +340,20 @@ namespace GKCore.Controllers
             UpdateChangedRecords(record);
         }
 
-        public void EditRecord()
+        public async void EditRecord()
         {
             GDMRecord record = GetSelectedRecordEx();
-            if (record != null && BaseController.EditRecord(fView, fView, record)) {
+            if (record != null && await BaseController.EditRecord(fView, fView, record)) {
                 RefreshLists(false);
             }
 
             UpdateChangedRecords(record);
         }
 
-        public void DeleteRecord()
+        public async void DeleteRecord()
         {
             GDMRecord record = GetSelectedRecordEx();
-            if (record != null && BaseController.DeleteRecord(fView, record, true)) {
+            if (record != null && await BaseController.DeleteRecord(fView, record, true)) {
                 RefreshLists(false);
             }
         }
@@ -352,10 +365,10 @@ namespace GKCore.Controllers
             try {
                 IHyperView hyperView = GetHyperViewByType(record.RecordType);
                 if (hyperView != null) {
-                    GKUtils.GetRecordContent(fContext, record, hyperView.Lines);
+                    GKUtils.GetRecordContent(fContext, record, hyperView.Lines, RecordContentType.Full);
                 }
             } catch (Exception ex) {
-                Logger.WriteError("BaseWinSDI.ShowRecordInfo()", ex);
+                Logger.WriteError("BaseWinController.ShowRecordInfo()", ex);
             }
         }
 
@@ -368,7 +381,7 @@ namespace GKCore.Controllers
             ShowRecordInfo(rec);
         }
 
-        public void SelectSummaryLink(string linkName)
+        public void SelectSummaryLink(IHyperView sender, string linkName)
         {
             if (linkName.StartsWith(GKData.INFO_HTTP_PREFIX)) {
                 GKUtils.LoadExtFile(linkName);
@@ -392,6 +405,16 @@ namespace GKCore.Controllers
                     ApplyFilter(GDMRecordType.rtIndividual, listMan);
                     fView.ShowRecordsTab(GDMRecordType.rtIndividual);
                 }
+            } else if (linkName.StartsWith(GKData.INFO_HREF_LOC_SUB)) {
+                string xref = linkName.Remove(0, GKData.INFO_HREF_LOC_SUB.Length);
+                var locRec = fContext.Tree.FindXRef<GDMLocationRecord>(xref);
+                if (locRec != null) BaseController.ShowMap_Sub(fView, locRec);
+            } else if (linkName.StartsWith(GKData.INFO_HREF_LOC_INDI)) {
+                string xref = linkName.Remove(0, GKData.INFO_HREF_LOC_INDI.Length);
+                var locRec = fContext.Tree.FindXRef<GDMLocationRecord>(xref);
+                if (locRec != null) BaseController.ShowMap_Indi(fView, locRec);
+            } else if (linkName.StartsWith(GKData.INFO_HREF_EXPAND_ASSO)) {
+                GKUtils.ExpandExtInfo(fContext, sender, linkName);
             } else {
                 SelectRecordByXRef(linkName);
             }
@@ -428,10 +451,10 @@ namespace GKCore.Controllers
             }
         }
 
-        public StringList GetRecordContent(GDMRecord record)
+        public StringList GetRecordContent(GDMRecord record, RecordContentType contentType)
         {
             StringList ctx = new StringList();
-            GKUtils.GetRecordContent(fContext, record, ctx);
+            GKUtils.GetRecordContent(fContext, record, ctx, contentType);
             return ctx;
         }
 
@@ -455,6 +478,12 @@ namespace GKCore.Controllers
             fContext.DoRedo();
         }
 
+        public void CopyContent()
+        {
+            var hyperView = GetHyperViewByType(GetSelectedRecordType());
+            CopyContent(hyperView);
+        }
+
         public void CopyContent(IHyperView hyperView)
         {
             if (hyperView == null) return;
@@ -472,39 +501,61 @@ namespace GKCore.Controllers
             fTabParts[(int)recType] = new TabParts(listView, splitterName, summary);
         }
 
-        public void SetSummaryWidth(bool uiAction)
+        /// <summary>
+        /// Sets tab splitter positions in response to interface events.
+        /// </summary>
+        /// <param name="userChange">true - if user change event (SplitterMoved), false - settings change event</param>
+        public void SetSummaryWidth(bool userChange)
         {
             if (AppHost.Instance.HasFeatureSupport(Feature.Mobile))
                 return;
 
-            if (!GlobalOptions.Instance.KeepInfoPansOverallSize)
-                return;
-
             try {
-                int currentTab, splitterPos;
+                GlobalOptions globOpts = GlobalOptions.Instance;
+                int currentTab;
 
-                if (uiAction) {
+                if (userChange) {
                     currentTab = fView.RecordTabs.SelectedIndex + 1;
-                    splitterPos = GetControl<ISplitter>(fTabParts[currentTab].SplitterName).Position;
-                    GlobalOptions.Instance.InfoPansOverallSize = splitterPos;
+                    int splitterPos = GetControl<ISplitter>(fTabParts[currentTab].SplitterName).Position;
+
+                    if (globOpts.KeepInfoPansOverallSize) {
+                        globOpts.InfoPansOverallSize = splitterPos;
+                    } else {
+                        GDMRecordType rt = (GDMRecordType)currentTab;
+                        globOpts.ListOptions[rt].SplitterPosition = splitterPos;
+                    }
                 } else {
                     currentTab = 0;
-                    splitterPos = GlobalOptions.Instance.InfoPansOverallSize;
-                    if (splitterPos <= 0) splitterPos = 300;
                 }
 
                 for (int i = 0; i < fTabParts.Length; i++) {
                     var tab = fTabParts[i];
-                    if (i != currentTab && tab != null) {
-                        var splitterHandler = GetControl<ISplitter>(tab.SplitterName);
-                        fView.EnableSplitterEvent(splitterHandler, false);
-                        splitterHandler.Position = splitterPos;
-                        fView.EnableSplitterEvent(splitterHandler, true);
+                    if (tab == null) continue;
+
+                    if (globOpts.KeepInfoPansOverallSize) {
+                        if (i != currentTab) {
+                            SetSplitterPos(tab, globOpts.InfoPansOverallSize);
+                        }
+                    } else {
+                        if (!userChange) {
+                            GDMRecordType rt = (GDMRecordType)i;
+                            SetSplitterPos(tab, globOpts.ListOptions[rt].SplitterPosition);
+                        }
                     }
                 }
             } catch (Exception ex) {
                 Logger.WriteError("BaseWinController.SetSummaryWidth()", ex);
             }
+        }
+
+        private void SetSplitterPos(TabParts tab, int splitterPos)
+        {
+            if (splitterPos <= 0) splitterPos = 300;
+
+            var splitterHandler = GetControl<ISplitter>(tab.SplitterName);
+            fView.EnableSplitterEvent(splitterHandler, false);
+            splitterHandler.Position = splitterPos;
+            fView.EnableSplitterEvent(splitterHandler, true);
         }
 
         public GDMRecordType GetSelectedRecordType()
@@ -583,10 +634,9 @@ namespace GKCore.Controllers
             for (var rt = GDMRecordType.rtIndividual; rt <= GDMRecordType.rtLocation; rt++) {
                 IListView rView = fTabParts[(int)rt].ListView;
                 if (rView != null) {
-                    rView.SetSortColumn(globOptions.ListOptions[rt].SortColumn, false);
-                    if (rt == GDMRecordType.rtIndividual) {
-                        globOptions.IndividualListColumns.CopyTo(rView.ListMan.ListColumns);
-                    }
+                    var columnOpts = globOptions.ListOptions[rt];
+                    rView.SetSortColumn(columnOpts.SortColumn, false);
+                    columnOpts.Columns.CopyTo(rView.ListMan.ListColumns);
                 }
             }
         }
@@ -597,10 +647,9 @@ namespace GKCore.Controllers
             for (var rt = GDMRecordType.rtIndividual; rt <= GDMRecordType.rtLocation; rt++) {
                 IListView rView = fTabParts[(int)rt].ListView;
                 if (rView != null) {
-                    globOptions.ListOptions[rt].SortColumn = rView.SortColumn;
-                    if (rt == GDMRecordType.rtIndividual) {
-                        rView.ListMan.ListColumns.CopyTo(globOptions.IndividualListColumns);
-                    }
+                    var columnOpts = globOptions.ListOptions[rt];
+                    columnOpts.SortColumn = rView.SortColumn;
+                    rView.ListMan.ListColumns.CopyTo(columnOpts.Columns);
                 }
             }
         }
@@ -647,6 +696,7 @@ namespace GKCore.Controllers
             SetSummaryWidth(false);
             RestoreListsSettings();
             RefreshLists(true);
+            SetMainTitle();
         }
 
         public void NavAdd(GDMRecord aRec)
@@ -687,7 +737,8 @@ namespace GKCore.Controllers
 
         public void SetMainTitle()
         {
-            string caption = Path.GetFileName(fContext.FileName);
+            string caption = (GlobalOptions.Instance.DisplayFullFileName) ? fContext.FileName : Path.GetFileName(fContext.FileName);
+
             if (fContext.Modified) {
                 caption = @"* " + caption;
             }
@@ -743,13 +794,13 @@ namespace GKCore.Controllers
             var gfxProvider = AppHost.GfxProvider;
             switch (fContext.ShieldState) {
                 case ShieldState.None:
-                    img = gfxProvider.LoadResourceImage("Resources.rg_shield_none.gif", true);
+                    img = gfxProvider.LoadResourceImage("Resources.rg_shield_none.gif", ImageTarget.UI, true);
                     break;
                 case ShieldState.Middle:
-                    img = gfxProvider.LoadResourceImage("Resources.rg_shield_mid.gif", true);
+                    img = gfxProvider.LoadResourceImage("Resources.rg_shield_mid.gif", ImageTarget.UI, true);
                     break;
                 case ShieldState.Maximum:
-                    img = gfxProvider.LoadResourceImage("Resources.rg_shield_max.gif", true);
+                    img = gfxProvider.LoadResourceImage("Resources.rg_shield_max.gif", ImageTarget.UI, true);
                     break;
             }
             return img;
@@ -913,14 +964,16 @@ namespace GKCore.Controllers
                     GetControl<IMenuItem>("miTreeTools").Text = LangMan.LS(LSID.MITreeTools);
                     GetControl<IMenuItem>("miOptions").Text = LangMan.LS(LSID.MIOptions) + @"...";
 
-                    GetControl<IMenuItem>("miTreeCompare").Text = LangMan.LS(LSID.ToolOp_1);
-                    GetControl<IMenuItem>("miTreeMerge").Text = LangMan.LS(LSID.ToolOp_2);
-                    GetControl<IMenuItem>("miTreeSplit").Text = LangMan.LS(LSID.ToolOp_3);
+                    GetControl<IMenuItem>("miTreeCompare").Text = LangMan.LS(LSID.TreeCompare);
+                    GetControl<IMenuItem>("miTreeMerge").Text = LangMan.LS(LSID.TreeMerge);
+                    GetControl<IMenuItem>("miTreeSplit").Text = LangMan.LS(LSID.TreeSplit);
                     GetControl<IMenuItem>("miRecMerge").Text = LangMan.LS(LSID.MergeDuplicates);
-                    GetControl<IMenuItem>("miFamilyGroups").Text = LangMan.LS(LSID.ToolOp_6);
-                    GetControl<IMenuItem>("miTreeCheck").Text = LangMan.LS(LSID.ToolOp_7);
-                    GetControl<IMenuItem>("miPatSearch").Text = LangMan.LS(LSID.ToolOp_8);
-                    GetControl<IMenuItem>("miPlacesManager").Text = LangMan.LS(LSID.ToolOp_9);
+                    GetControl<IMenuItem>("miFamilyGroups").Text = LangMan.LS(LSID.FragmentSearch);
+                    GetControl<IMenuItem>("miTreeCheck").Text = LangMan.LS(LSID.TreeCheck);
+                    GetControl<IMenuItem>("miPatSearch").Text = LangMan.LS(LSID.PatriarchsSearch);
+                    GetControl<IMenuItem>("miPlacesManager").Text = LangMan.LS(LSID.PlacesManager);
+                    GetControl<IMenuItem>("miPhotosBatchAdding").Text = LangMan.LS(LSID.PhotosBatchAdding);
+                    GetControl<IMenuItem>("miCleanImagesCache").Text = LangMan.LS(LSID.CleanImagesCache);
 
                     GetControl<IMenuItem>("miContext").Text = LangMan.LS(LSID.MIContext);
                     GetControl<IMenuItem>("miAbout").Text = LangMan.LS(LSID.MIAbout) + @"...";
@@ -948,6 +1001,7 @@ namespace GKCore.Controllers
                         SetToolTip("tbStats", LangMan.LS(LSID.StatsTip));
                         SetToolTip("tbPrev", LangMan.LS(LSID.PrevRec));
                         SetToolTip("tbNext", LangMan.LS(LSID.NextRec));
+                        SetToolTip("tbPartialView", LangMan.LS(LSID.PartialViewTip));
 
                         GetControl<IMenuItem>("miPedigreeAscend2").Text = LangMan.LS(LSID.MIPedigreeAscend);
                         GetControl<IMenuItem>("miPedigreeDescend2").Text = LangMan.LS(LSID.MIPedigreeDescend);
@@ -959,12 +1013,24 @@ namespace GKCore.Controllers
                     GetControl<IMenuItem>("miContRecordDuplicate").Text = LangMan.LS(LSID.RecordDuplicate);
                     GetControl<IMenuItem>("miContRecordMerge").Text = LangMan.LS(LSID.MergeDuplicates);
 
+                    GetControl<IMenuItem>("miContMediaMoveFile").Text = LangMan.LS(LSID.MoveFiles);
+                    GetControl<IMenuItem>("miContMediaMoveFile2Abs").Text = LangMan.LS(LSID.STRef);
+                    GetControl<IMenuItem>("miContMediaMoveFile2Rel").Text = LangMan.LS(LSID.STRel);
+                    GetControl<IMenuItem>("miContMediaMoveFile2Arc").Text = LangMan.LS(LSID.STArc);
+                    GetControl<IMenuItem>("miContMediaMoveFile2Stg").Text = LangMan.LS(LSID.STStg);
+
                     GetControl<IMenuItem>("miCopyContent").Text = LangMan.LS(LSID.Copy);
 
                     var miPlugins = GetControl<IMenuItem>("miPlugins");
-                    int num = miPlugins.SubItems.Count;
-                    for (int i = 0; i < num; i++) {
+                    for (int i = 0, num = miPlugins.SubItems.Count; i < num; i++) {
                         var mi = miPlugins.SubItems[i];
+                        IPlugin plugin = (IPlugin)mi.Tag;
+                        mi.Text = plugin.DisplayName;
+                    }
+
+                    var miReports = GetControl<IMenuItem>("miReports");
+                    for (int i = 0, num = miReports.SubItems.Count; i < num; i++) {
+                        var mi = miReports.SubItems[i];
                         IPlugin plugin = (IPlugin)mi.Tag;
                         mi.Text = plugin.DisplayName;
                     }
@@ -976,78 +1042,79 @@ namespace GKCore.Controllers
                     }
                 }
             } catch (Exception ex) {
-                Logger.WriteError("BaseWinSDI.SetLocale()", ex);
+                Logger.WriteError("BaseWinController.SetLocale()", ex);
             }
         }
 
         public override void ApplyTheme()
         {
-            if (AppHost.Instance.HasFeatureSupport(Feature.Themes)) {
-                // menu
-                GetControl<IMenuItem>("miFileNew").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileNew);
-                GetControl<IMenuItem>("miFileLoad").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileLoad);
-                GetControl<IMenuItem>("miFileSave").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileSave);
-                GetControl<IMenuItem>("miFileProperties").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileProperties);
-                GetControl<IMenuItem>("miExport").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Export);
-                GetControl<IMenuItem>("miExportTable").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_ExportTable);
-                GetControl<IMenuItem>("miExit").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Exit);
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
 
-                GetControl<IMenuItem>("miRecordAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordAdd);
-                GetControl<IMenuItem>("miRecordEdit").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordEdit);
-                GetControl<IMenuItem>("miRecordDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordDelete);
-                GetControl<IMenuItem>("miSearch").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Search);
-                GetControl<IMenuItem>("miFilter").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Filter);
+            // menu
+            GetControl<IMenuItem>("miFileNew").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileNew);
+            GetControl<IMenuItem>("miFileLoad").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileLoad);
+            GetControl<IMenuItem>("miFileSave").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileSave);
+            GetControl<IMenuItem>("miFileProperties").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileProperties);
+            GetControl<IMenuItem>("miExport").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Export);
+            GetControl<IMenuItem>("miExportTable").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_ExportTable);
+            GetControl<IMenuItem>("miExit").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Exit);
 
-                GetControl<IMenuItem>("miTreeAncestors").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeAncestors);
-                GetControl<IMenuItem>("miTreeDescendants").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeDescendants);
-                GetControl<IMenuItem>("miTreeBoth").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeBoth);
-                GetControl<IMenuItem>("miPedigreeAscend").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Pedigree);
-                GetControl<IMenuItem>("miPedigreeDescend").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Pedigree);
-                GetControl<IMenuItem>("miMap").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Maps);
-                GetControl<IMenuItem>("miStats").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Stats);
+            GetControl<IMenuItem>("miRecordAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordAdd);
+            GetControl<IMenuItem>("miRecordEdit").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordEdit);
+            GetControl<IMenuItem>("miRecordDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordDelete);
+            GetControl<IMenuItem>("miSearch").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Search);
+            GetControl<IMenuItem>("miFilter").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Filter);
 
-                GetControl<IMenuItem>("miOrganizer").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Organizer);
-                GetControl<IMenuItem>("miSlideshow").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Slideshow);
-                GetControl<IMenuItem>("miOptions").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Settings);
+            GetControl<IMenuItem>("miTreeAncestors").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeAncestors);
+            GetControl<IMenuItem>("miTreeDescendants").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeDescendants);
+            GetControl<IMenuItem>("miTreeBoth").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeBoth);
+            GetControl<IMenuItem>("miPedigreeAscend").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Pedigree);
+            GetControl<IMenuItem>("miPedigreeDescend").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Pedigree);
+            GetControl<IMenuItem>("miMap").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Maps);
+            GetControl<IMenuItem>("miStats").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Stats);
 
-                GetControl<IMenuItem>("miContext").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Help);
-                GetControl<IMenuItem>("miAbout").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_About);
+            GetControl<IMenuItem>("miOrganizer").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Organizer);
+            GetControl<IMenuItem>("miSlideshow").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Slideshow);
+            GetControl<IMenuItem>("miOptions").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Settings);
 
-                // toolbar
-                //GetControl<IMenuItem>("tbFileNew").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileNew);
-                //GetControl<IMenuItem>("tbFileLoad").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileLoad);
-                //GetControl<IMenuItem>("tbFileSave").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileSave);
-                //GetControl<IMenuItem>("tbRecordAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordAdd);
-                //GetControl<IMenuItem>("tbRecordEdit").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordEdit);
-                //GetControl<IMenuItem>("tbRecordDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordDelete);
-                //GetControl<IMenuItem>("tbFilter").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Filter);
-                //GetControl<IMenuItem>("tbTreeAncestors").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeAncestors);
-                //GetControl<IMenuItem>("tbTreeDescendants").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeDescendants);
-                //GetControl<IMenuItem>("tbTreeBoth").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeBoth);
-                //GetControl<IMenuItem>("tbPedigree").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Pedigree);
-                //GetControl<IMenuItem>("tbStats").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Stats);
-                //GetControl<IMenuItem>("tbPrev").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Prev);
-                //GetControl<IMenuItem>("tbNext").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Next);
-                //GetControl<IMenuItem>("tbSendMail").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_SendMail);
-            }
+            GetControl<IMenuItem>("miContext").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Help);
+            GetControl<IMenuItem>("miAbout").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_About);
+
+            // toolbar
+            GetControl<IToolItem>("tbFileNew").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileNew, true);
+            GetControl<IToolItem>("tbFileLoad").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileLoad, true);
+            GetControl<IToolItem>("tbFileSave").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_FileSave, true);
+            GetControl<IToolItem>("tbRecordAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordAdd, true);
+            GetControl<IToolItem>("tbRecordEdit").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordEdit, true);
+            GetControl<IToolItem>("tbRecordDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_RecordDelete, true);
+            GetControl<IToolItem>("tbFilter").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Filter, true);
+            GetControl<IToolItem>("tbTreeAncestors").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeAncestors, true);
+            GetControl<IToolItem>("tbTreeDescendants").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeDescendants, true);
+            GetControl<IToolItem>("tbTreeBoth").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_TreeBoth, true);
+            GetControl<IToolItem>("tbPedigree").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Pedigree, true);
+            GetControl<IToolItem>("tbStats").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Stats, true);
+            GetControl<IToolItem>("tbPrev").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Prev, true);
+            GetControl<IToolItem>("tbNext").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Next, true);
+            GetControl<IToolItem>("tbSendMail").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_SendMail, true);
+            GetControl<IToolItem>("tbPartialView").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_PartialView, true);
         }
 
         #region Dialogs
 
-        private void ShowCommonFilter(GDMRecordType rt, IRecordsListModel listMan)
+        private async void ShowCommonFilter(GDMRecordType rt, IRecordsListModel listMan)
         {
             using (var dlg = AppHost.Container.Resolve<ICommonFilterDlg>(fView, listMan)) {
-                if (AppHost.Instance.ShowModalX(dlg, fView, false)) {
+                if (await AppHost.Instance.ShowModalAsync(dlg, fView, false)) {
                     AppHost.Instance.NotifyFilter(fView, rt, listMan, listMan.Filter);
                     ApplyFilter(rt);
                 }
             }
         }
 
-        private void ShowPersonsFilter(GDMRecordType rt, IRecordsListModel listMan)
+        private async void ShowPersonsFilter(GDMRecordType rt, IRecordsListModel listMan)
         {
             using (var dlg = AppHost.Container.Resolve<IPersonsFilterDlg>(fView, listMan)) {
-                if (AppHost.Instance.ShowModalX(dlg, fView, false)) {
+                if (await AppHost.Instance.ShowModalAsync(dlg, fView, false)) {
                     ApplyFilter(rt, listMan);
                 }
             }
@@ -1077,98 +1144,98 @@ namespace GKCore.Controllers
             }
         }
 
-        public void ShowFileProperties()
+        public async void ShowFileProperties()
         {
             try {
                 fContext.BeginUpdate();
 
                 using (var dlg = AppHost.ResolveDialog<IFilePropertiesDlg>(fView)) {
-                    AppHost.Instance.ShowModalX(dlg, fView, false);
+                    await AppHost.Instance.ShowModalAsync(dlg, fView, false);
                 }
             } finally {
                 fContext.EndUpdate();
             }
         }
 
-        public void ShowScripts()
+        public async void ShowScripts()
         {
             try {
                 fContext.BeginUpdate();
 
                 using (var dlg = AppHost.Container.Resolve<IScriptEditWin>(fView)) {
-                    AppHost.Instance.ShowModalX(dlg, fView, false);
+                    await AppHost.Instance.ShowModalAsync(dlg, fView, false);
                 }
             } finally {
                 fContext.EndUpdate();
             }
         }
 
-        public void ShowTreeSplit()
+        public async void ShowTreeSplit()
         {
             try {
                 fContext.BeginUpdate();
                 using (var dlg = AppHost.Container.Resolve<ITreeSplitDlg>(fView)) {
-                    AppHost.Instance.ShowModalX(dlg, fView, false);
+                    await AppHost.Instance.ShowModalAsync(dlg, fView, false);
                 }
             } finally {
                 fContext.EndUpdate();
             }
         }
 
-        public void ShowTreeMerge()
+        public async void ShowTreeMerge()
         {
             try {
                 fContext.BeginUpdate();
                 using (var dlg = AppHost.Container.Resolve<ITreeMergeDlg>(fView)) {
-                    AppHost.Instance.ShowModalX(dlg, fView, false);
+                    await AppHost.Instance.ShowModalAsync(dlg, fView, false);
                 }
             } finally {
                 fContext.EndUpdate();
             }
         }
 
-        public void ShowTreeCompare()
+        public async void ShowTreeCompare()
         {
             try {
                 fContext.BeginUpdate();
                 using (var dlg = AppHost.Container.Resolve<ITreeCompareDlg>(fView)) {
-                    AppHost.Instance.ShowModalX(dlg, fView, false);
+                    await AppHost.Instance.ShowModalAsync(dlg, fView, false);
                 }
             } finally {
                 fContext.EndUpdate();
             }
         }
 
-        public void ShowTreeCheck()
+        public async void ShowTreeCheck()
         {
             try {
                 fContext.BeginUpdate();
                 using (var dlg = AppHost.Container.Resolve<ITreeCheckDlg>(fView)) {
-                    AppHost.Instance.ShowModalX(dlg, fView, false);
+                    await AppHost.Instance.ShowModalAsync(dlg, fView, false);
                 }
             } finally {
                 fContext.EndUpdate();
             }
         }
 
-        public void ShowPlacesManager()
+        public async void ShowPlacesManager()
         {
             try {
                 fContext.BeginUpdate();
                 using (var dlg = AppHost.Container.Resolve<IPlacesManagerDlg>(fView)) {
-                    AppHost.Instance.ShowModalX(dlg, fView, false);
+                    await AppHost.Instance.ShowModalAsync(dlg, fView, false);
                 }
             } finally {
                 fContext.EndUpdate();
             }
         }
 
-        public void ShowPatSearch()
+        public async void ShowPatSearch()
         {
             try {
                 fContext.BeginUpdate();
                 using (var dlg = AppHost.Container.Resolve<IPatriarchsSearchDlg>(fView)) {
-                    AppHost.Instance.ShowModalX(dlg, fView, false);
+                    await AppHost.Instance.ShowModalAsync(dlg, fView, false);
                 }
             } finally {
                 fContext.EndUpdate();
@@ -1184,6 +1251,59 @@ namespace GKCore.Controllers
             }
         }
 
+        public async void ShowPhotosBatchAdding()
+        {
+            try {
+                if (!fContext.CheckBasePath())
+                    return;
+
+                string[] fileNames = await AppHost.StdDialogs.GetOpenFiles("", string.Empty, LangMan.LS(LSID.ImagesFilter), 1, "");
+                if (fileNames == null || fileNames.Length == 0) return;
+
+                int added = 0;
+                for (int i = 0; i < fileNames.Length; i++) {
+                    var filePath = fileNames[i];
+
+                    try {
+                        string fName = Path.GetFileNameWithoutExtension(filePath);
+                        if (!string.IsNullOrEmpty(fName) && fName.Contains(",")) {
+                            string[] parts = fName.Split(',');
+                            string indiName = parts[0].Trim();
+                            string indiYear = parts[1].Trim();
+
+                            Dictionary<string, string> facts = new Dictionary<string, string>();
+                            facts.Add("birth_year", indiYear);
+
+                            var indi = fContext.FindIndividual(indiName, facts);
+                            if (indi != null) {
+                                var mediaRec = new GDMMultimediaRecord(fContext.Tree);
+                                fContext.Tree.NewXRef(mediaRec);
+
+                                var fileRef = mediaRec.FileReferences.Add(new GDMFileReferenceWithTitle());
+                                fileRef.MediaType = GDMMediaType.mtPhoto;
+                                fileRef.Title = fName;
+
+                                if (fContext.MediaSave(fileRef, filePath, GlobalOptions.Instance.MediaStoreDefault)) {
+                                    fContext.Tree.AddRecord(mediaRec);
+
+                                    var mmLink = indi.AddMultimedia(mediaRec);
+                                    added += 1;
+                                }
+                            }
+                        }
+                    } catch (Exception ex) {
+                        Logger.WriteError("BaseWinController.ShowPhotosBatchAdding().1", ex);
+                    }
+                }
+
+                RefreshLists(false);
+
+                AppHost.StdDialogs.ShowMessage(LangMan.LS(LSID.AddedNPhotos, added, fileNames.Length));
+            } catch (Exception ex) {
+                Logger.WriteError("BaseWinController.ShowPhotosBatchAdding().0", ex);
+            }
+        }
+
         public void SendMail()
         {
             if (fView.CheckModified()) {
@@ -1194,21 +1314,20 @@ namespace GKCore.Controllers
 
         public void ShowMap()
         {
-            var mapsWin = AppHost.Container.Resolve<IMapsViewerWin>(fView);
-            AppHost.Instance.ShowWindow(mapsWin);
+            BaseController.ShowMap(fView);
         }
 
-        public void ShowOrganizer()
+        public async void ShowOrganizer()
         {
             using (var dlg = AppHost.Container.Resolve<IOrganizerWin>(fView)) {
-                AppHost.Instance.ShowModalX(dlg, fView, false);
+                await AppHost.Instance.ShowModalAsync(dlg, fView, false);
             }
         }
 
-        public void ShowRelationshipCalculator()
+        public async void ShowRelationshipCalculator()
         {
             using (var dlg = AppHost.Container.Resolve<IRelationshipCalculatorDlg>(fView)) {
-                AppHost.Instance.ShowModalX(dlg, fView, false);
+                await AppHost.Instance.ShowModalAsync(dlg, fView, false);
             }
         }
 
@@ -1265,17 +1384,6 @@ namespace GKCore.Controllers
             BaseController.ShowTreeChart(fView, GetSelectedPersonVar(), chartKind);
         }
 
-        public void ShowCircleChart(CircleChartType chartKind)
-        {
-            var selPerson = GetSelectedPerson();
-            if (selPerson == null) return;
-
-            if (BaseController.DetectCycle(fContext.Tree, selPerson)) return;
-
-            var fmChart = AppHost.Container.Resolve<ICircleChartWin>(fView, selPerson, chartKind);
-            AppHost.Instance.ShowWindow(fmChart);
-        }
-
         public void SendLog()
         {
             SysUtils.SendMail(GKData.APP_MAIL, "GEDKeeper: feedback", "This automatic notification of error.", AppHost.GetLogFilename());
@@ -1286,10 +1394,10 @@ namespace GKCore.Controllers
             GKUtils.LoadExtFile(AppHost.GetLogFilename());
         }
 
-        public void ShowAbout()
+        public async void ShowAbout()
         {
             using (var dlg = AppHost.Container.Resolve<IAboutDlg>()) {
-                AppHost.Instance.ShowModalX(dlg, fView, false);
+                await AppHost.Instance.ShowModalAsync(dlg, fView, false);
             }
         }
 
@@ -1339,7 +1447,24 @@ namespace GKCore.Controllers
 
         public void FindAndReplace()
         {
+            if (AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
+                throw new NotImplementedException();
+            }
+
             var win = AppHost.Container.Resolve<IFARDlg>(fView);
+            AppHost.Instance.ShowWindow(win);
+        }
+
+        public void ShowPartialView()
+        {
+            if (AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
+                throw new NotImplementedException();
+            }
+
+            var recType = GetSelectedRecordType();
+            var listMan = GetRecordsListManByType(recType);
+
+            var win = AppHost.Container.Resolve<IPartialView>(fView, recType, listMan.Filter);
             AppHost.Instance.ShowWindow(win);
         }
 

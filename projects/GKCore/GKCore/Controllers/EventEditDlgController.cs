@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -28,6 +28,7 @@ using GKCore.Design.Views;
 using GKCore.Interfaces;
 using GKCore.Lists;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -46,6 +47,7 @@ namespace GKCore.Controllers
             set {
                 if (fEvent != value) {
                     fEvent = value;
+                    AppHost.EventDefinitions.Collect(fEvent);
                     UpdateView();
                 }
             }
@@ -56,6 +58,7 @@ namespace GKCore.Controllers
         {
             fTempLocation = null;
             fView.EventType.Activate();
+            fView.Date.DateChanged += new EventHandler(dateCtl_DateChanged);
         }
 
         public override void Init(IBaseWindow baseWin)
@@ -65,6 +68,13 @@ namespace GKCore.Controllers
             fView.NotesList.ListModel = new NoteLinksListModel(fView, baseWin, fLocalUndoman);
             fView.MediaList.ListModel = new MediaLinksListModel(fView, baseWin, fLocalUndoman);
             fView.SourcesList.ListModel = new SourceCitationsListModel(fView, baseWin, fLocalUndoman);
+        }
+
+        public override void Done()
+        {
+            fView.NotesList.ListModel.SaveSettings();
+            fView.MediaList.ListModel.SaveSettings();
+            fView.SourcesList.ListModel.SaveSettings();
         }
 
         public override bool Accept()
@@ -80,13 +90,11 @@ namespace GKCore.Controllers
                     throw ex;
                 }
 
-                int eventType = fView.EventType.GetSelectedTag<int>();
-                var eventProps = (fEvent is GDMFamilyEvent) ? GKData.FamilyEvents[eventType] : GKData.PersonEvents[eventType];
-
-                if (eventProps.Kind == PersonEventKind.ekFact) {
+                var eventDef = fView.EventType.GetSelectedTag<EventDef>();
+                if (eventDef.Kind == EventKind.ekFact) {
                     var attrValue = fView.Attribute.Text;
 
-                    if (string.IsNullOrEmpty(attrValue)) {
+                    if (string.IsNullOrEmpty(attrValue) && !eventDef.AcceptableEmpty) {
                         AppHost.StdDialogs.ShowError(LangMan.LS(LSID.FactValueIsInvalid));
                         throw new Exception();
                     }
@@ -96,17 +104,18 @@ namespace GKCore.Controllers
                     fEvent.StringValue = string.Empty;
                 }
 
+                fEvent.SetName(eventDef.Tag);
+                fEvent.Classification = eventDef.Type;
+
+                string key = eventDef.Tag + ":" + eventDef.Type;
+                fBase.Context.EventStats.Increment(key);
+
                 fEvent.Place.StringValue = fView.Place.Text;
                 fBase.Context.Tree.SetPtrValue(fEvent.Place.Location, fTempLocation);
-                fEvent.Classification = fView.EventName.Text;
                 fEvent.Cause = fView.Cause.Text;
                 fEvent.Agency = fView.Agency.Text;
 
-                string tagName = eventProps.Sign;
-                fEvent.SetName(tagName);
-                fBase.Context.EventStats.Increment(tagName);
-
-                if (fEvent is GDMIndividualEvent && eventProps.Kind == PersonEventKind.ekFact) {
+                if (fEvent is GDMIndividualEvent && eventDef.Kind == EventKind.ekFact) {
                     var attr = new GDMIndividualAttribute();
                     attr.Assign(fEvent);
                     fEvent = attr;
@@ -121,17 +130,24 @@ namespace GKCore.Controllers
             }
         }
 
-        private void SetEventTypes(GKData.EventStruct[] eventTypes)
+        private void SetEventTypes(EventTarget target)
         {
-            var freqList = new List<FreqItem<int>>();
-
+            var freqList = new List<FreqItem<EventDef>>();
             var eventStats = fBase.Context.EventStats;
-            for (int i = 0; i < eventTypes.Length; i++) {
-                int stat = eventStats.GetValue(eventTypes[i].Sign);
-                freqList.Add(new FreqItem<int>(i, LangMan.LS(eventTypes[i].Name), stat));
+
+            var eventDefs = AppHost.EventDefinitions.List;
+            for (int i = 0; i < eventDefs.Count; i++) {
+                var evDef = eventDefs[i];
+
+                if ((evDef.Target == target || evDef.Target == EventTarget.etAny) && evDef.Enabled) {
+                    string key = evDef.Tag + ":" + evDef.Type;
+                    int stat = eventStats.GetValue(key);
+
+                    freqList.Add(new FreqItem<EventDef>(evDef, evDef.DisplayName, stat));
+                }
             }
 
-            FreqCollection<string>.PopulateCombo(fView.EventType, freqList, 0);
+            FreqCollection<string>.PopulateCombo(fView.EventType, freqList, null);
         }
 
         public override void UpdateView()
@@ -140,44 +156,39 @@ namespace GKCore.Controllers
             fView.MediaList.ListModel.DataOwner = fEvent;
             fView.SourcesList.ListModel.DataOwner = fEvent;
 
-            var evtName = fEvent.GetTagName();
-            if (fEvent is GDMFamilyEvent) {
-                SetEventTypes(GKData.FamilyEvents);
-                int idx = GKUtils.GetFamilyEventIndex(evtName);
-                if (idx < 0) idx = 0;
-                fView.EventType.SetSelectedTag(idx);
-            } else {
-                SetEventTypes(GKData.PersonEvents);
-                int idx = GKUtils.GetPersonEventIndex(evtName);
-                if (idx < 0) idx = 0;
-                fView.EventType.SetSelectedTag(idx);
+            EventTarget evtTarget = fEvent is GDMFamilyEvent ? EventTarget.etFamily : EventTarget.etIndividual;
+            SetEventTypes(evtTarget);
 
-                if (idx >= 0 && GKData.PersonEvents[idx].Kind == PersonEventKind.ekFact) {
-                    fView.Attribute.Text = fEvent.StringValue;
-                }
+            var evDef = AppHost.EventDefinitions.Find(fEvent);
+            fView.EventType.SetSelectedTag(evDef);
+            if (evDef != null && evDef.Kind == EventKind.ekFact) {
+                fView.Attribute.Text = fEvent.StringValue;
             }
 
             ChangeEventType();
 
             fView.Date.Date = fEvent.Date.Value;
-            fView.EventName.Text = fEvent.Classification;
-            fView.Cause.Text = fEvent.Cause;
-            fView.Agency.Text = fEvent.Agency;
+
+            var causVals = fBase.Context.ValuesCollection.GetValues(GEDCOMTagName.CAUS);
+            UpdateCombo(fView.Cause, true, false, causVals, fEvent.Cause);
+
+            var agncVals = fBase.Context.ValuesCollection.GetValues(GEDCOMTagName.AGNC);
+            UpdateCombo(fView.Agency, true, false, agncVals, fEvent.Agency);
 
             fTempLocation = fBase.Context.Tree.GetPtrValue<GDMLocationRecord>(fEvent.Place.Location);
-            UpdatePlace();
+            UpdatePlace(true);
 
             fView.NotesList.UpdateSheet();
             fView.MediaList.UpdateSheet();
             fView.SourcesList.UpdateSheet();
         }
 
-        private void UpdatePlace()
+        private void UpdatePlace(bool forced)
         {
             if (fTempLocation != null) {
-                fView.Place.Text = fTempLocation.LocationName;
+                fView.Place.Text = GKUtils.GetLocationNameExt(fTempLocation, fView.Date.Date);
                 SetLocationMode(true);
-            } else {
+            } else if (forced) {
                 fView.Place.Text = fEvent.Place.StringValue;
                 SetLocationMode(false);
             }
@@ -198,21 +209,21 @@ namespace GKCore.Controllers
             }
         }
 
-        public void AddPlace()
+        public async void AddPlace()
         {
-            fTempLocation = fBase.Context.SelectRecord(fView, GDMRecordType.rtLocation, new object[] { fView.Place.Text }) as GDMLocationRecord;
-            UpdatePlace();
+            fTempLocation = await fBase.Context.SelectRecord(fView, GDMRecordType.rtLocation, new object[] { fView.Place.Text }) as GDMLocationRecord;
+            UpdatePlace(true);
         }
 
         public void RemovePlace()
         {
             fTempLocation = null;
-            UpdatePlace();
+            UpdatePlace(true);
         }
 
-        public void ModifyAddress()
+        public async void ModifyAddress()
         {
-            BaseController.ModifyAddress(fView, fBase, fEvent.Address);
+            await BaseController.ModifyAddress(fView, fBase, fEvent.Address);
         }
 
         private void SetAttributeMode(bool active)
@@ -229,48 +240,39 @@ namespace GKCore.Controllers
 
         public void ChangeEventType()
         {
-            int idx = fView.EventType.GetSelectedTag<int>();
-
-            if (fEvent is GDMFamilyEvent) {
-                SetAttributeMode(false);
-            } else {
-                if (idx >= 0) {
-                    if (GKData.PersonEvents[idx].Kind == PersonEventKind.ekEvent) {
-                        SetAttributeMode(false);
-                    } else {
-                        SetAttributeMode(true);
-                    }
-                }
+            var evDef = fView.EventType.GetSelectedTag<EventDef>();
+            if (evDef == null) {
+                evDef = AppHost.EventDefinitions.Find(GEDCOMTagName.EVEN, "");
+                fView.EventType.SetSelectedTag(evDef);
             }
 
-            string evName;
-            if (fEvent is GDMFamilyEvent) {
-                evName = GKData.FamilyEvents[idx].Sign;
-            } else {
-                evName = GKData.PersonEvents[idx].Sign;
-            }
+            string evTag = evDef.Tag;
+            bool isFact = (evDef.Kind == EventKind.ekFact);
+            SetAttributeMode(isFact);
 
-            // TODO: It is necessary to provide the registrable list of values for different tag types.
             string[] vals;
-            bool canbeSorted, userInput;
-
-            if (evName == GEDCOMTagName._BGRO) {
+            bool canbeSorted, fixedList;
+            if (evTag == GEDCOMTagName._BGRO) {
                 vals = GKData.BloodGroups.Split('|');
                 canbeSorted = false;
-                userInput = false;
+                fixedList = true;
             } else {
-                vals = fBase.Context.ValuesCollection.GetValues(evName);
+                string evKey = evDef.Tag + ":" + evDef.Type;
+                vals = fBase.Context.ValuesCollection.GetValues(evKey);
                 canbeSorted = true;
-                userInput = true;
+                fixedList = false;
             }
+            UpdateCombo(fView.Attribute, canbeSorted, fixedList, vals, fView.Attribute.Text);
+        }
 
-            if (vals != null) {
-                string tmp = fView.Attribute.Text;
-                fView.Attribute.Clear();
-                fView.Attribute.AddRange(vals, canbeSorted);
-                fView.Attribute.Text = tmp;
-                fView.Attribute.ReadOnly = (!userInput);
+        private void UpdateCombo(IComboBox combo, bool canbeSorted, bool readOnly, string[] values, string current)
+        {
+            combo.Clear();
+            if (values != null) {
+                combo.AddRange(values, canbeSorted);
             }
+            combo.Text = current;
+            combo.ReadOnly = readOnly;
         }
 
         public void SendData(string signature, string data)
@@ -279,6 +281,11 @@ namespace GKCore.Controllers
                 var dateControl = fView.Date;
                 dateControl.PasteValue(data);
             }
+        }
+
+        private void dateCtl_DateChanged(object sender, System.EventArgs e)
+        {
+            UpdatePlace(false);
         }
 
         public override void SetLocale()
@@ -301,6 +308,21 @@ namespace GKCore.Controllers
 
             SetToolTip("btnPlaceAdd", LangMan.LS(LSID.PlaceAddTip));
             SetToolTip("btnPlaceDelete", LangMan.LS(LSID.PlaceDeleteTip));
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            GetControl<IButton>("btnPlaceAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnPlaceDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
+
+            fView.NotesList.ApplyTheme();
+            fView.MediaList.ApplyTheme();
+            fView.SourcesList.ApplyTheme();
         }
     }
 }

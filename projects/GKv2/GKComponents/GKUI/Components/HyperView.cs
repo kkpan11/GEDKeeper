@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2011-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2011-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -93,6 +93,7 @@ namespace GKUI.Components
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             UpdateStyles();
 
+            CenteredImage = false;
             BorderStyle = BorderStyle.Fixed3D;
             DoubleBuffered = true;
             TabStop = true;
@@ -102,7 +103,7 @@ namespace GKUI.Components
             fCurrentLink = null;
             fHeights = new List<int>();
             fLines = new StringList();
-            fLines.OnChange += LinesChanged;
+            fLines.OnChange += new NotifyEventHandler(LinesChanged);
             fLinkColor = Color.Blue;
             fTextSize = ExtSize.Empty;
             fStrFormat = new StringFormat(StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoWrap | StringFormatFlags.NoClip);

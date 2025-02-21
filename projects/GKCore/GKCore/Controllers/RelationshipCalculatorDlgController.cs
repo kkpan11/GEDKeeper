@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -24,6 +24,8 @@ using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Kinships;
 using GKCore.Options;
+using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -40,15 +42,15 @@ namespace GKCore.Controllers
         {
         }
 
-        public void SelectRec1()
+        public async void SelectRec1()
         {
-            GDMIndividualRecord iRec = fBase.Context.SelectRecord(fView, GDMRecordType.rtIndividual, null) as GDMIndividualRecord;
+            GDMIndividualRecord iRec = await fBase.Context.SelectRecord(fView, GDMRecordType.rtIndividual, null) as GDMIndividualRecord;
             if (iRec != null) SetRec1(iRec);
         }
 
-        public void SelectRec2()
+        public async void SelectRec2()
         {
-            GDMIndividualRecord iRec = fBase.Context.SelectRecord(fView, GDMRecordType.rtIndividual, null) as GDMIndividualRecord;
+            GDMIndividualRecord iRec = await fBase.Context.SelectRecord(fView, GDMRecordType.rtIndividual, null) as GDMIndividualRecord;
             if (iRec != null) SetRec2(iRec);
         }
 
@@ -122,6 +124,13 @@ namespace GKCore.Controllers
             GetControl<IButton>("btnRec2Select").Text = LangMan.LS(LSID.DlgSelect) + @"...";
             GetControl<ILabel>("lblKinship").Text = LangMan.LS(LSID.Kinship);
             GetControl<IButton>("btnSwap").Text = LangMan.LS(LSID.Swap);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnClose").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

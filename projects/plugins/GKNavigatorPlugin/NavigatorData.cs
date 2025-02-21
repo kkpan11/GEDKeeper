@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -40,6 +40,7 @@ namespace GKNavigatorPlugin
         Records,
         Languages,
         Associations,
+        WebLinks,
     }
 
 
@@ -196,10 +197,10 @@ namespace GKNavigatorPlugin
 
         public void ShowItem(IBaseWindow baseWin, object tag, IListView listView)
         {
-            if (tag is GDMRecordType) {
-                ShowData(baseWin, DataCategory.Records, (GDMRecordType)tag, listView);
-            } else if (tag is DataCategory) {
-                ShowData(baseWin, (DataCategory)tag, GDMRecordType.rtNone, listView);
+            if (tag is GDMRecordType recType) {
+                ShowData(baseWin, DataCategory.Records, recType, listView);
+            } else if (tag is DataCategory dataCat) {
+                ShowData(baseWin, dataCat, GDMRecordType.rtNone, listView);
             }
         }
 
@@ -236,6 +237,10 @@ namespace GKNavigatorPlugin
 
                 case DataCategory.Associations:
                     ShowAssociations(baseWin, listView);
+                    break;
+
+                case DataCategory.WebLinks:
+                    //ShowWebLinks(baseWin);
                     break;
             }
         }
@@ -339,7 +344,7 @@ namespace GKNavigatorPlugin
             listView.BeginUpdate();
             try {
                 listView.Clear();
-                listView.AddColumn(fPlugin.LangMan.LS(PLS.Record), 400, true);
+                listView.AddColumn(LangMan.LS(LSID.Record), 400, true);
 
                 foreach (var rec in navArray) {
                     listView.AddItem(rec, new object[] { GKUtils.GetRecordName(tree, rec, true) });
@@ -362,7 +367,7 @@ namespace GKNavigatorPlugin
             listView.BeginUpdate();
             try {
                 listView.Clear();
-                listView.AddColumn(fPlugin.LangMan.LS(PLS.Filter), 400, true);
+                listView.AddColumn(LangMan.LS(LSID.MIFilter), 400, true);
 
                 BaseData baseData = fPlugin.Data[baseWin.Context.FileName];
                 if (baseData == null) return;
@@ -401,7 +406,7 @@ namespace GKNavigatorPlugin
             listView.BeginUpdate();
             try {
                 listView.Clear();
-                listView.AddColumn(fPlugin.LangMan.LS(PLS.Person), 400, true);
+                listView.AddColumn(LangMan.LS(LSID.Person), 400, true);
 
                 foreach (var iRec in bookmarks) {
                     listView.AddItem(iRec, new object[] { GKUtils.GetNameString(iRec, false) });
@@ -452,7 +457,7 @@ namespace GKNavigatorPlugin
             listView.BeginUpdate();
             try {
                 listView.Clear();
-                listView.AddColumn(fPlugin.LangMan.LS(PLS.Language), 200, true);
+                listView.AddColumn(LangMan.LS(LSID.Language), 200, true);
 
                 var langsList = baseWin.Context.LangStats.ToList();
                 foreach (var lang in langsList) {
@@ -481,8 +486,8 @@ namespace GKNavigatorPlugin
             listView.BeginUpdate();
             try {
                 listView.Clear();
-                listView.AddColumn(fPlugin.LangMan.LS(PLS.Person), 400, false);
-                listView.AddColumn(fPlugin.LangMan.LS(PLS.Relation), 400, false);
+                listView.AddColumn(LangMan.LS(LSID.Person), 400, false);
+                listView.AddColumn(LangMan.LS(LSID.Relation), 400, false);
 
                 var tree = baseWin.Context.Tree;
                 int num = tree.RecordsCount;

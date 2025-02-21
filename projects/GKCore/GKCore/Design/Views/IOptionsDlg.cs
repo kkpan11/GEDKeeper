@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,12 +19,15 @@
  */
 
 using GKCore.Interfaces;
+using GKCore.Lists;
 using GKCore.Options;
 
 namespace GKCore.Design.Views
 {
     public interface IOptionsDlg : ICommonDialog
     {
+        ISheetList EventTypesList { get; }
+
         void AcceptCircleChartsOptions();
         void UpdateCircleChartsOptions();
         void SetPage(OptionsPage page);

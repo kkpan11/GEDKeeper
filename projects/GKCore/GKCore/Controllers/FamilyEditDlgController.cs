@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -27,6 +27,7 @@ using GKCore.Design;
 using GKCore.Design.Views;
 using GKCore.Operations;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -65,10 +66,21 @@ namespace GKCore.Controllers
             base.Init(baseWin);
 
             fView.ChildrenList.ListModel = new FamilyChildrenListModel(fView, baseWin, fLocalUndoman);
-            fView.EventsList.ListModel = new EventsListModel(fView, baseWin, fLocalUndoman, false);
+            fView.EventsList.ListModel = new EventsListModel(fView, baseWin, fLocalUndoman);
             fView.NotesList.ListModel = new NoteLinksListModel(fView, baseWin, fLocalUndoman);
             fView.MediaList.ListModel = new MediaLinksListModel(fView, baseWin, fLocalUndoman);
             fView.SourcesList.ListModel = new SourceCitationsListModel(fView, baseWin, fLocalUndoman);
+            fView.UserRefList.ListModel = new URefsListModel(fView, baseWin, fLocalUndoman);
+        }
+
+        public override void Done()
+        {
+            fView.ChildrenList.ListModel.SaveSettings();
+            fView.EventsList.ListModel.SaveSettings();
+            fView.NotesList.ListModel.SaveSettings();
+            fView.MediaList.ListModel.SaveSettings();
+            fView.SourcesList.ListModel.SaveSettings();
+            fView.UserRefList.ListModel.SaveSettings();
         }
 
         public void SetTarget(TargetMode targetType, GDMIndividualRecord target)
@@ -115,6 +127,7 @@ namespace GKCore.Controllers
                 fView.NotesList.ListModel.DataOwner = fFamilyRecord;
                 fView.MediaList.ListModel.DataOwner = fFamilyRecord;
                 fView.SourcesList.ListModel.DataOwner = fFamilyRecord;
+                fView.UserRefList.ListModel.DataOwner = fFamilyRecord;
 
                 if (fFamilyRecord == null) {
                     fView.MarriageStatus.Enabled = false;
@@ -155,32 +168,33 @@ namespace GKCore.Controllers
             fView.NotesList.UpdateSheet();
             fView.MediaList.UpdateSheet();
             fView.SourcesList.UpdateSheet();
+            fView.UserRefList.UpdateSheet();
         }
 
-        public void AddHusband()
+        public async void AddHusband()
         {
-            if (BaseController.AddFamilyHusband(fView, fBase, fLocalUndoman, fFamilyRecord)) {
+            if (await BaseController.AddFamilyHusband(fView, fBase, fLocalUndoman, fFamilyRecord)) {
                 UpdateControls();
             }
         }
 
-        public void DeleteHusband()
+        public async void DeleteHusband()
         {
-            if (BaseController.DeleteFamilyHusband(fBase, fLocalUndoman, fFamilyRecord)) {
+            if (await BaseController.DeleteFamilyHusband(fBase, fLocalUndoman, fFamilyRecord)) {
                 UpdateControls();
             }
         }
 
-        public void AddWife()
+        public async void AddWife()
         {
-            if (BaseController.AddFamilyWife(fView, fBase, fLocalUndoman, fFamilyRecord)) {
+            if (await BaseController.AddFamilyWife(fView, fBase, fLocalUndoman, fFamilyRecord)) {
                 UpdateControls();
             }
         }
 
-        public void DeleteWife()
+        public async void DeleteWife()
         {
-            if (BaseController.DeleteFamilyWife(fBase, fLocalUndoman, fFamilyRecord)) {
+            if (await BaseController.DeleteFamilyWife(fBase, fLocalUndoman, fFamilyRecord)) {
                 UpdateControls();
             }
         }
@@ -210,6 +224,7 @@ namespace GKCore.Controllers
             GetControl<ITabPage>("pageNotes").Text = LangMan.LS(LSID.RPNotes);
             GetControl<ITabPage>("pageMultimedia").Text = LangMan.LS(LSID.RPMultimedia);
             GetControl<ITabPage>("pageSources").Text = LangMan.LS(LSID.RPSources);
+            GetControl<ITabPage>("pageUserRefs").Text = LangMan.LS(LSID.UserRefs);
             GetControl<ILabel>("lblRestriction").Text = LangMan.LS(LSID.Restriction);
 
             SetToolTip("btnHusbandAdd", LangMan.LS(LSID.HusbandAddTip));
@@ -218,6 +233,29 @@ namespace GKCore.Controllers
             SetToolTip("btnWifeAdd", LangMan.LS(LSID.WifeAddTip));
             SetToolTip("btnWifeDelete", LangMan.LS(LSID.WifeDeleteTip));
             SetToolTip("btnWifeSel", LangMan.LS(LSID.WifeSelTip));
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            GetControl<IButton>("btnHusbandAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnHusbandDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
+            GetControl<IButton>("btnHusbandSel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_LinkJump, true);
+
+            GetControl<IButton>("btnWifeAdd").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Attach, true);
+            GetControl<IButton>("btnWifeDelete").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Detach, true);
+            GetControl<IButton>("btnWifeSel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_LinkJump, true);
+
+            fView.ChildrenList.ApplyTheme();
+            fView.EventsList.ApplyTheme();
+            fView.NotesList.ApplyTheme();
+            fView.MediaList.ApplyTheme();
+            fView.SourcesList.ApplyTheme();
+            fView.UserRefList.ApplyTheme();
         }
     }
 }

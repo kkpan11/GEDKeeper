@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,13 +19,17 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
+using GKCore.Controllers;
 using GKCore.Design;
 using GKCore.Design.Controls;
 using GKCore.Interfaces;
 using GKCore.Operations;
+using GKCore.Options;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Lists
 {
@@ -91,13 +95,16 @@ namespace GKCore.Lists
     }
 
 
-    public interface ISheetList : IBaseControl
+    public interface ISheetList : IBaseControl, IThemedView
     {
         EnumSet<SheetButton> Buttons { get; set; }
         ISheetModel ListModel { get; set; }
         IListView ListView { get; }
         bool ReadOnly { get; set; }
 
+        event ModifyEventHandler OnModify;
+
+        void UpdateButtons();
         void UpdateSheet();
     }
 
@@ -105,10 +112,12 @@ namespace GKCore.Lists
     public interface ISheetModel : IListSource
     {
         EnumSet<RecordAction> AllowedActions { get; set; }
-        GDMObject DataOwner { get; set; }
+        IGDMObject DataOwner { get; set; }
         ISheetList SheetList { get; set; }
 
-        void Modify(object sender, ModifyEventArgs eArgs);
+        Task Modify(object sender, ModifyEventArgs eArgs);
+
+        void ShowDetails(object itemData);
     }
 
 
@@ -116,24 +125,29 @@ namespace GKCore.Lists
     /// 
     /// </summary>
     public abstract class SheetModel<T> : ListSource<T>, ISheetModel
-        where T : GDMTag
+        where T : class, IGDMObject
     {
         private EnumSet<RecordAction> fAllowedActions;
         protected ISheetList fSheetList;
         protected readonly IBaseWindow fBaseWin;
         protected readonly ChangeTracker fUndoman;
-        protected GDMObject fDataOwner;
+        protected IGDMObject fDataOwner;
         protected IView fOwner;
-        protected GDMList<T> fStructList;
+        protected IGDMList<T> fStructList;
 
 
         public EnumSet<RecordAction> AllowedActions
         {
             get { return fAllowedActions; }
-            set { fAllowedActions = value; }
+            set {
+                fAllowedActions = value;
+                if (fSheetList != null) {
+                    fSheetList.UpdateButtons();
+                }
+            }
         }
 
-        public GDMObject DataOwner
+        public IGDMObject DataOwner
         {
             get {
                 return fDataOwner;
@@ -154,7 +168,12 @@ namespace GKCore.Lists
 
 
         protected SheetModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) :
-            base(baseWin.Context, new ListColumns<T>())
+            this(owner, baseWin, undoman, new ListColumns(GKListType.ltNone))
+        {
+        }
+
+        protected SheetModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman, ListColumns defaultListColumns) :
+            base((baseWin != null ? baseWin.Context : null), defaultListColumns)
         {
             fAllowedActions = new EnumSet<RecordAction>();
             fBaseWin = baseWin;
@@ -162,21 +181,38 @@ namespace GKCore.Lists
             fUndoman = undoman;
         }
 
-        protected void UpdateStructList(GDMList<T> structList)
+        protected void UpdateStructList(IGDMList<T> structList)
         {
-            fStructList = structList;
+            try {
+                fStructList = structList;
 
-            int contentSize = fStructList.Count;
-            InitContent(contentSize);
+                int contentSize = fStructList.Count;
+                InitContent(contentSize);
 
-            for (int i = 0; i < contentSize; i++) {
-                T rec = fStructList[i];
-                AddFilteredContent(rec);
+                for (int i = 0; i < contentSize; i++) {
+                    T rec = fStructList[i];
+                    AddFilteredContent(rec);
+                }
+
+                DoneContent();
+            } catch (Exception ex) {
+                Logger.WriteError("SheetModel.UpdateStructList()", ex);
             }
-
-            DoneContent();
         }
 
-        public abstract void Modify(object sender, ModifyEventArgs eArgs);
+        public virtual async Task Modify(object sender, ModifyEventArgs eArgs)
+        {
+        }
+
+        protected virtual GDMRecord GetReferenceRecord(object itemData)
+        {
+            return null;
+        }
+
+        public void ShowDetails(object itemData)
+        {
+            if (fBaseWin != null)
+                BaseController.ViewRecordInfo(fOwner, fBaseWin, GetReferenceRecord(itemData));
+        }
     }
 }

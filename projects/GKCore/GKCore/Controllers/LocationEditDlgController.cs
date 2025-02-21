@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -23,13 +23,14 @@ using System.Collections.Generic;
 using BSLib;
 using GDModel;
 using GDModel.Providers.GEDCOM;
+using GKCore.Design;
 using GKCore.Design.Controls;
+using GKCore.Design.Views;
 using GKCore.Interfaces;
 using GKCore.Lists;
 using GKCore.Maps;
-using GKCore.Design;
-using GKCore.Design.Views;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -61,22 +62,51 @@ namespace GKCore.Controllers
         {
             base.Init(baseWin);
 
+            fView.NamesList.ListModel = new LocationNamesListModel(fView, baseWin, fLocalUndoman);
+            fView.LinksList.ListModel = new LocationLinksListModel(fView, baseWin, fLocalUndoman);
+
             fView.NotesList.ListModel = new NoteLinksListModel(fView, baseWin, fLocalUndoman);
             fView.MediaList.ListModel = new MediaLinksListModel(fView, baseWin, fLocalUndoman);
+
+            fView.NamesList.OnModify += ModifyNamesSheet;
+        }
+
+        public override void Done()
+        {
+            fView.NamesList.ListModel.SaveSettings();
+            fView.LinksList.ListModel.SaveSettings();
+            fView.NotesList.ListModel.SaveSettings();
+            fView.MediaList.ListModel.SaveSettings();
+        }
+
+        private void ModifyNamesSheet(object sender, ModifyEventArgs eArgs)
+        {
+            fView.Name.Text = fLocationRecord.LocationName;
+        }
+
+        public void CheckPrimaryName()
+        {
+            if (!string.IsNullOrEmpty(fView.Name.Text) && string.IsNullOrEmpty(fLocationRecord.LocationName)) {
+                // new record
+                fLocationRecord.LocationName = fView.Name.Text;
+                fView.NamesList.UpdateSheet();
+            }
         }
 
         public override bool Accept()
         {
             try {
-                bool isRenamed = (fLocationRecord.LocationName != fView.Name.Text);
+                //bool isRenamed = (fLocationRecord.LocationName != fView.Name.Text);
 
                 fLocationRecord.LocationName = fView.Name.Text;
                 fLocationRecord.Map.Lati = ConvertHelper.ParseFloat(fView.Latitude.Text, 0.0);
                 fLocationRecord.Map.Long = ConvertHelper.ParseFloat(fView.Longitude.Text, 0.0);
 
+                //bool isChanged = isRenamed || fLocalUndoman.HasChanges();
+
                 fLocalUndoman.Commit();
 
-                if (isRenamed) {
+                /*if (isChanged)*/ {
                     fBase.Context.Tree.RenameLocationRecord(fLocationRecord);
                 }
 
@@ -94,6 +124,9 @@ namespace GKCore.Controllers
             fView.Name.Text = fLocationRecord.LocationName;
             fView.Latitude.Text = GEDCOMUtils.CoordToStr(fLocationRecord.Map.Lati);
             fView.Longitude.Text = GEDCOMUtils.CoordToStr(fLocationRecord.Map.Long);
+
+            fView.NamesList.ListModel.DataOwner = fLocationRecord;
+            fView.LinksList.ListModel.DataOwner = fLocationRecord;
 
             fView.NotesList.ListModel.DataOwner = fLocationRecord;
             fView.MediaList.ListModel.DataOwner = fLocationRecord;
@@ -166,6 +199,14 @@ namespace GKCore.Controllers
             fView.MapBrowser.SetCenter(pt.Latitude, pt.Longitude, -1);
         }
 
+        public void SelectCursorCoords()
+        {
+            var pos = fView.MapBrowser.TargetPosition;
+
+            fView.Latitude.Text = GEDCOMUtils.CoordToStr(pos.Lat);
+            fView.Longitude.Text = GEDCOMUtils.CoordToStr(pos.Lng);
+        }
+
         public void ShowOnMap()
         {
             if (fView.Latitude.Text != "" && fView.Longitude.Text != "") {
@@ -190,12 +231,31 @@ namespace GKCore.Controllers
             GetControl<IButton>("btnSearch").Text = LangMan.LS(LSID.Search);
             GetControl<IButton>("btnSelect").Text = LangMan.LS(LSID.SelectCoords);
             GetControl<IButton>("btnSelectName").Text = LangMan.LS(LSID.SelectName);
+            GetControl<IButton>("btnSelectCursor").Text = LangMan.LS(LSID.CursorCoords);
 
             SetToolTip("btnShowOnMap", LangMan.LS(LSID.ShowOnMapTip));
 
-            fView.GeoCoordsList.AddColumn(LangMan.LS(LSID.Title), 200, false);
+            fView.GeoCoordsList.ClearColumns();
+            fView.GeoCoordsList.AddColumn(LangMan.LS(LSID.Title), 300, false);
             fView.GeoCoordsList.AddColumn(LangMan.LS(LSID.Latitude), 80, false);
             fView.GeoCoordsList.AddColumn(LangMan.LS(LSID.Longitude), 80, false);
+
+            GetControl<ITabPage>("pageHistory").Text = LangMan.LS(LSID.History);
+            GetControl<IGroupBox>("pageHistNames").Text = LangMan.LS(LSID.Names);
+            GetControl<IGroupBox>("pageHistLinks").Text = LangMan.LS(LSID.TopLevelLinks);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            fView.NamesList.ApplyTheme();
+            fView.LinksList.ApplyTheme();
+            fView.NotesList.ApplyTheme();
+            fView.MediaList.ApplyTheme();
         }
     }
 }

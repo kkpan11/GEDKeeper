@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,8 @@ using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Options;
 using GKCore.Search;
+using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -75,6 +77,14 @@ namespace GKCore.Controllers
             }
         }
 
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnPrev").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Prev);
+            GetControl<IButton>("btnNext").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Next);
+        }
+
         private void CheckListValue(StringList list, string value)
         {
             string val = value.Trim();
@@ -86,7 +96,10 @@ namespace GKCore.Controllers
         public override void UpdateView()
         {
             GetControl<IComboBox>("cmbPattern").AddStrings(GlobalOptions.Instance.FARPatterns);
+            GetControl<IComboBox>("cmbPattern").ReadOnly = false;
+
             GetControl<IComboBox>("cmbReplacement").AddStrings(GlobalOptions.Instance.FARReplacements);
+            GetControl<IComboBox>("cmbReplacement").ReadOnly = false;
 
             GetControl<ICheckBox>("chkWholeWord").Enabled = false; // TODO: next version
 

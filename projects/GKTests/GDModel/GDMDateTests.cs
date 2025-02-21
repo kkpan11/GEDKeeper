@@ -1,6 +1,6 @@
 /*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -300,7 +300,7 @@ namespace GDModel
         [Test]
         public void Test_Create()
         {
-            GDMTag result = new GDMDate(GEDCOMTagsTable.Lookup("BLAH"), "");
+            GDMTag result = new GDMDate(GEDCOMTagsTable.Lookup("BLAH"));
             Assert.IsNotNull(result);
             Assert.AreEqual("BLAH", result.GetTagName());
         }
@@ -619,7 +619,7 @@ namespace GDModel
         [Test]
         public void Test_GetUDNByFormattedStr()
         {
-            UDN expResult = UDN.CreateUnknown();
+            UDN expResult = UDN.Unknown;
             UDN result = GDMDate.GetUDNByFormattedStr("", GDMCalendar.dcGregorian);
             Assert.AreEqual(expResult, result);
         }
@@ -737,8 +737,46 @@ namespace GDModel
             Assert.AreEqual("20 DEC 1980", GDMDate.CreateByFormattedStr("20/12/1980", false).StringValue);
             Assert.AreEqual("DEC 1980", GDMDate.CreateByFormattedStr("__/12/1980", false).StringValue);
             Assert.AreEqual(null, GDMDate.CreateByFormattedStr("1980", false));
-            
+
             Assert.Throws(typeof(GDMDateException), () => { GDMDate.CreateByFormattedStr("1980", true); });
+        }
+
+        [Test]
+        [TestCase("", "")]
+        [TestCase("2024", "2025")]
+        [TestCase("001B.C.", "001")]
+        [TestCase("OCT 2024", "NOV 2024")]
+        [TestCase("DEC 2024", "JAN 2025")]
+        [TestCase("01 OCT 2024", "02 OCT 2024")]
+        [TestCase("31 OCT 2024", "01 NOV 2024")]
+        [TestCase("31 DEC 2024", "01 JAN 2025")]
+        [TestCase("28 FEB 1900", "01 MAR 1900")]
+        [TestCase("28 FEB 2000", "29 FEB 2000")]
+        [TestCase("29 FEB 2000", "01 MAR 2000")]
+        [TestCase("28 FEB 2023", "01 MAR 2023")]
+        [TestCase("28 FEB 2024", "29 FEB 2024")]
+        [TestCase("29 FEB 2024", "01 MAR 2024")]
+        [TestCase("28 FEB 001B.C.", "29 FEB 001B.C.")]
+        [TestCase("29 FEB 001B.C.", "01 MAR 001B.C.")]
+        [TestCase("28 FEB 005B.C.", "29 FEB 005B.C.")]
+        [TestCase("29 FEB 005B.C.", "01 MAR 005B.C.")]
+        [TestCase("28 FEB 097B.C.", "29 FEB 097B.C.")]
+        [TestCase("29 FEB 097B.C.", "01 MAR 097B.C.")]
+        [TestCase("28 FEB 101B.C.", "01 MAR 101B.C.")]
+        [TestCase("@#DJULIAN@ 29 FEB 2024", "@#DJULIAN@ 01 MAR 2024")]
+        [TestCase("@#DJULIAN@ 28 FEB 1900", "@#DJULIAN@ 29 FEB 1900")]
+        [TestCase("@#DJULIAN@ 29 FEB 1900", "@#DJULIAN@ 01 MAR 1900")]
+        [TestCase("@#DJULIAN@ 28 FEB 2000", "@#DJULIAN@ 29 FEB 2000")]
+        [TestCase("@#DJULIAN@ 29 FEB 2000", "@#DJULIAN@ 01 MAR 2000")]
+        [TestCase("@#DJULIAN@ 28 FEB 2023", "@#DJULIAN@ 01 MAR 2023")]
+        [TestCase("@#DJULIAN@ 29 FEB 2024", "@#DJULIAN@ 01 MAR 2024")]
+        public void Test_Increment_Decrement(string value, string expected)
+        {
+            var d = new GDMDate();
+            d.StringValue = value;
+            Assert.AreEqual(expected, GDMDate.Increment(d).StringValue);
+            d.StringValue = expected;
+            Assert.AreEqual(value, GDMDate.Decrement(d).StringValue);
         }
     }
 }

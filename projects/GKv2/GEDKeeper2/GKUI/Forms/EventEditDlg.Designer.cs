@@ -17,10 +17,9 @@
 		private System.Windows.Forms.Label lblOrg;
 		private System.Windows.Forms.Label lblAttrValue;
 		private System.Windows.Forms.ComboBox cmbEventType;
-		private System.Windows.Forms.TextBox txtEventName;
 		private System.Windows.Forms.TextBox txtEventPlace;
-		private System.Windows.Forms.TextBox txtEventCause;
-		private System.Windows.Forms.TextBox txtEventOrg;
+		private System.Windows.Forms.ComboBox txtEventCause;
+		private System.Windows.Forms.ComboBox txtEventOrg;
 		private System.Windows.Forms.ComboBox txtAttribute;
 		private System.Windows.Forms.Button btnPlaceAdd;
 		private System.Windows.Forms.Button btnPlaceDelete;
@@ -42,10 +41,9 @@
 		    this.btnPlaceAdd = new System.Windows.Forms.Button();
 		    this.btnPlaceDelete = new System.Windows.Forms.Button();
 		    this.cmbEventType = new System.Windows.Forms.ComboBox();
-		    this.txtEventName = new System.Windows.Forms.TextBox();
 		    this.txtEventPlace = new System.Windows.Forms.TextBox();
-		    this.txtEventCause = new System.Windows.Forms.TextBox();
-		    this.txtEventOrg = new System.Windows.Forms.TextBox();
+		    this.txtEventCause = new System.Windows.Forms.ComboBox();
+		    this.txtEventOrg = new System.Windows.Forms.ComboBox();
 		    this.txtAttribute = new System.Windows.Forms.ComboBox();
 		    this.pageNotes = new System.Windows.Forms.TabPage();
 		    this.pageMultimedia = new System.Windows.Forms.TabPage();
@@ -103,7 +101,6 @@
 		    this.pageCommon.Controls.Add(this.btnPlaceAdd);
 		    this.pageCommon.Controls.Add(this.btnPlaceDelete);
 		    this.pageCommon.Controls.Add(this.cmbEventType);
-		    this.pageCommon.Controls.Add(this.txtEventName);
 		    this.pageCommon.Controls.Add(this.txtEventPlace);
 		    this.pageCommon.Controls.Add(this.txtEventCause);
 		    this.pageCommon.Controls.Add(this.txtEventOrg);
@@ -121,10 +118,10 @@
 		    this.dateCtl.Name = "dateCtl";
 		    this.dateCtl.Size = new System.Drawing.Size(474, 63);
 		    this.dateCtl.TabIndex = 10;
-		    // 
-		    // lblEvent
-		    // 
-		    this.lblEvent.AutoSize = true;
+            // 
+            // lblEvent
+            // 
+            this.lblEvent.AutoSize = true;
 		    this.lblEvent.Location = new System.Drawing.Point(11, 10);
 		    this.lblEvent.Name = "lblEvent";
 		    this.lblEvent.Size = new System.Drawing.Size(56, 17);
@@ -202,13 +199,6 @@
 		    this.cmbEventType.Size = new System.Drawing.Size(259, 25);
 		    this.cmbEventType.TabIndex = 1;
 		    this.cmbEventType.SelectedIndexChanged += new System.EventHandler(this.EditEventType_SelectedIndexChanged);
-		    // 
-		    // txtEventName
-		    // 
-		    this.txtEventName.Location = new System.Drawing.Point(280, 29);
-		    this.txtEventName.Name = "txtEventName";
-		    this.txtEventName.Size = new System.Drawing.Size(316, 24);
-		    this.txtEventName.TabIndex = 2;
 		    // 
 		    // txtEventPlace
 		    // 
@@ -296,5 +286,5 @@
 		    this.pageCommon.PerformLayout();
 		    this.ResumeLayout(false);
 		}
-	}
+    }
 }

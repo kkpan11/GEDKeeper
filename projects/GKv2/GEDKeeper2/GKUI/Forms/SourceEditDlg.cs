@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -36,6 +36,7 @@ namespace GKUI.Forms
         private readonly GKSheetList fNotesList;
         private readonly GKSheetList fMediaList;
         private readonly GKSheetList fRepositoriesList;
+        private readonly GKSheetList fUserRefList;
 
         public GDMSourceRecord SourceRecord
         {
@@ -58,6 +59,11 @@ namespace GKUI.Forms
         ISheetList ISourceEditDlg.RepositoriesList
         {
             get { return fRepositoriesList; }
+        }
+
+        ISheetList ISourceEditDlg.UserRefList
+        {
+            get { return fUserRefList; }
         }
 
         ITextBox ISourceEditDlg.ShortTitle
@@ -85,6 +91,11 @@ namespace GKUI.Forms
             get { return GetControlHandler<ITextBox>(txtText); }
         }
 
+        IDateControl ISourceEditDlg.Date
+        {
+            get { return GetControlHandler<IDateControl>(dateCtl); }
+        }
+
         #endregion
 
         public SourceEditDlg(IBaseWindow baseWin)
@@ -102,6 +113,9 @@ namespace GKUI.Forms
             fRepositoriesList = new GKSheetList(pageRepositories);
             fRepositoriesList.SetControlName("fRepositoriesList"); // for purpose of tests
             fRepositoriesList.OnModify += ModifyReposSheet;
+
+            fUserRefList = new GKSheetList(pageUserRefs);
+            fUserRefList.SetControlName("fUserRefList"); // for purpose of tests
 
             fController = new SourceEditDlgController(this);
             fController.Init(baseWin);

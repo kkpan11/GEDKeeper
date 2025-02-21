@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih, Ruslan Garipov.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih, Ruslan Garipov.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -32,6 +32,7 @@ using GKCore.Interfaces;
 using GKCore.Lists;
 using GKCore.Options;
 using GKUI.Platform.Handlers;
+using GKUI.Themes;
 
 namespace GKUI.Components
 {
@@ -140,16 +141,28 @@ namespace GKUI.Components
         {
             if (form == null) return;
 
-            //form.StartPosition = FormStartPosition.Manual;
-
-            // Center the new window on a monitor, where the parent window
-            // is located.
+            // Center the new window on a monitor, where the parent window is located.
             Screen screen = Screen.FromRectangle(parentRect);
             if (screen != null) {
                 var workArea = screen.WorkingArea;
 
-                int fx = (int)workArea.Left + (((int)workArea.Width - form.Width) >> 1);
-                int fy = (int)workArea.Top + (((int)workArea.Height - form.Height) >> 1);
+                //Logger.WriteInfo(string.Format("ParentRect: {0} - {1} - {2} - {3}", parentRect.Left, parentRect.Top, parentRect.Width, parentRect.Height));
+                //Logger.WriteInfo(string.Format("Dlg: {0} - {1}", form.Width, form.Height));
+
+                int fx = (int)parentRect.Left + ((int)(parentRect.Width - form.Width) / 2);
+                int fy = (int)parentRect.Top + ((int)(parentRect.Height - form.Height) / 2);
+
+                //Logger.WriteInfo(string.Format("Loc: {0} - {1}", fx, fy));
+
+                if (!workArea.Contains(fx, fy)) {
+                    //Logger.WriteInfo("not contains");
+
+                    fx = (int)workArea.Left + ((int)(workArea.Width - form.Width) / 2);
+                    fy = (int)workArea.Top + ((int)(workArea.Height - form.Height) / 2);
+
+                    //Logger.WriteInfo(string.Format("Loc: {0} - {1}", fx, fy));
+                }
+
                 form.Location = new Point(fx, fy);
             }
         }
@@ -247,7 +260,9 @@ namespace GKUI.Components
 
         public static Bitmap LoadResourceImage(string resName)
         {
-            return new Bitmap(GKUtils.LoadResourceStream(resName));
+            using (var stream = GKUtils.LoadResourceStream(resName)) {
+                return new Bitmap(stream);
+            }
         }
 
         public static void ProcessName(object sender)
@@ -401,6 +416,16 @@ namespace GKUI.Components
                 if (field != null)
                     field.SetValue(instance, value);
             }
+        }
+
+        public static void SetButtonThemeImage(Button button, ThemeElement themeElement)
+        {
+            if (button == null) return;
+
+            var themeImage = AppHost.ThemeManager.GetThemeImage(themeElement, true);
+            if (themeImage == null) return;
+
+            button.Image = ((ImageHandler)themeImage).Handle;
         }
     }
 }

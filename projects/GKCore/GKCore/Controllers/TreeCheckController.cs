@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -20,12 +20,14 @@
 
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 using GDModel;
-using GKCore.Design.Controls;
 using GKCore.Design;
+using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Tools;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -52,6 +54,8 @@ namespace GKCore.Controllers
         public void CheckBase()
         {
             fOptions.CheckIndividualPlaces = GetControl<ICheckBox>("chkCheckPersonPlaces").Checked;
+            fOptions.CheckCensuses = GetControl<ICheckBox>("chkCheckCensuses").Checked;
+            fOptions.CheckLinks = GetControl<ICheckBox>("chkCheckLinks").Checked;
 
             AppHost.Instance.ExecuteWork((controller) => {
                 TreeInspector.CheckBase(fBase, fChecksList, controller, fOptions);
@@ -76,16 +80,22 @@ namespace GKCore.Controllers
             }
         }
 
-        public void Repair()
+        public async Task Repair()
         {
             try {
+                bool modified = false;
                 int num = fView.ChecksList.Items.Count;
                 for (int i = 0; i < num; i++) {
                     IListItem item = fView.ChecksList.Items[i];
                     if (item.Checked) {
                         var checkObj = item.Tag as TreeInspector.CheckObj;
-                        TreeInspector.RepairProblem(fView, fBase, checkObj);
+                        await TreeInspector.RepairProblem(fView, fBase, checkObj);
+                        modified = true;
                     }
+                }
+
+                if (modified) {
+                    fBase.Context.SetModified();
                 }
             } finally {
                 fBase.RefreshLists(false);
@@ -152,7 +162,7 @@ namespace GKCore.Controllers
 
         public override void SetLocale()
         {
-            fView.Title = LangMan.LS(LSID.ToolOp_7);
+            fView.Title = LangMan.LS(LSID.TreeCheck);
 
             if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
                 GetControl<IButton>("btnClose").Text = LangMan.LS(LSID.DlgClose);
@@ -161,16 +171,25 @@ namespace GKCore.Controllers
                 GetControl<IMenuItem>("miCopyXRef").Text = LangMan.LS(LSID.CopyXRef);
             }
 
-            GetControl<ITabPage>("pageTreeCheck").Text = LangMan.LS(LSID.ToolOp_7);
+            GetControl<ITabPage>("pageTreeCheck").Text = LangMan.LS(LSID.TreeCheck);
             GetControl<IButton>("btnAnalyseBase").Text = LangMan.LS(LSID.Analyze);
             GetControl<IButton>("btnBaseRepair").Text = LangMan.LS(LSID.Repair);
 
             GetControl<ITabPage>("pageOptions").Text = LangMan.LS(LSID.MIOptions);
             GetControl<ICheckBox>("chkCheckPersonPlaces").Text = LangMan.LS(LSID.CheckPersonPlaces);
+            GetControl<ICheckBox>("chkCheckCensuses").Text = LangMan.LS(LSID.CensusAnalysis);
+            GetControl<ICheckBox>("chkCheckLinks").Text = LangMan.LS(LSID.CheckLinks);
 
             fView.ChecksList.AddColumn(LangMan.LS(LSID.Record), 400, false);
             fView.ChecksList.AddColumn(LangMan.LS(LSID.Problem), 200, false);
             fView.ChecksList.AddColumn(LangMan.LS(LSID.Solve), 200, false);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnClose").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

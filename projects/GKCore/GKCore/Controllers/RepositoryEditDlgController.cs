@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,7 @@ using GKCore.Lists;
 using GKCore.Design;
 using GKCore.Design.Views;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -58,6 +59,13 @@ namespace GKCore.Controllers
             base.Init(baseWin);
 
             fView.NotesList.ListModel = new NoteLinksListModel(fView, baseWin, fLocalUndoman);
+            fView.UserRefList.ListModel = new URefsListModel(fView, baseWin, fLocalUndoman);
+        }
+
+        public override void Done()
+        {
+            fView.NotesList.ListModel.SaveSettings();
+            fView.UserRefList.ListModel.SaveSettings();
         }
 
         public override bool Accept()
@@ -81,11 +89,12 @@ namespace GKCore.Controllers
             fView.Name.Text = fRepositoryRecord.RepositoryName;
 
             fView.NotesList.ListModel.DataOwner = fRepositoryRecord;
+            fView.UserRefList.ListModel.DataOwner = fRepositoryRecord;
         }
 
-        public void ModifyAddress()
+        public async void ModifyAddress()
         {
-            BaseController.ModifyAddress(fView, fBase, fRepositoryRecord.Address);
+            await BaseController.ModifyAddress(fView, fBase, fRepositoryRecord.Address);
         }
 
         public override void SetLocale()
@@ -95,7 +104,19 @@ namespace GKCore.Controllers
             GetControl<IButton>("btnCancel").Text = LangMan.LS(LSID.DlgCancel);
             GetControl<ILabel>("lblName").Text = LangMan.LS(LSID.Title);
             GetControl<ITabPage>("pageNotes").Text = LangMan.LS(LSID.RPNotes);
+            GetControl<ITabPage>("pageUserRefs").Text = LangMan.LS(LSID.UserRefs);
             GetControl<IButton>("btnAddress").Text = LangMan.LS(LSID.Address) + @"...";
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            fView.NotesList.ApplyTheme();
+            fView.UserRefList.ApplyTheme();
         }
     }
 }

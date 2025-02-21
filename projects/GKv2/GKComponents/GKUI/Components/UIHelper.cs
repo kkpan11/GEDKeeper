@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih, Ruslan Garipov.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih, Ruslan Garipov.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -30,6 +30,7 @@ using GKCore.Interfaces;
 using GKCore.Lists;
 using GKCore.Options;
 using GKUI.Platform.Handlers;
+using GKUI.Themes;
 
 namespace GKUI.Components
 {
@@ -265,7 +266,9 @@ namespace GKUI.Components
 
         public static Bitmap LoadResourceImage(string resName)
         {
-            return new Bitmap(GKUtils.LoadResourceStream(resName));
+            using (var stream = GKUtils.LoadResourceStream(resName)) {
+                return new Bitmap(stream);
+            }
         }
 
         public static void ProcessName(object sender)
@@ -288,6 +291,16 @@ namespace GKUI.Components
             toolStrip.AutoSize = false;
             toolStrip.Height = 27;
             #endif
+        }
+
+        public static void SetButtonThemeImage(ToolStripButton button, ThemeElement themeElement)
+        {
+            if (button == null) return;
+
+            var themeImage = AppHost.ThemeManager.GetThemeImage(themeElement, true);
+            if (themeImage == null) return;
+
+            button.Image = ((ImageHandler)themeImage).Handle;
         }
 
         #region Application's autorun

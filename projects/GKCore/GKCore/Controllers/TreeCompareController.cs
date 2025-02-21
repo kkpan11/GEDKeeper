@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,7 @@ using GKCore.Design;
 using GKCore.Design.Views;
 using GKCore.Tools;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -46,9 +47,9 @@ namespace GKCore.Controllers
         {
         }
 
-        public void SelectExternalFile()
+        public async void SelectExternalFile()
         {
-            string fileName = AppHost.StdDialogs.GetOpenFile("", "", LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT);
+            string fileName = await AppHost.StdDialogs.GetOpenFile("", "", LangMan.LS(LSID.GEDCOMFilter), 1, GKData.GEDCOM_EXT);
             if (string.IsNullOrEmpty(fileName)) return;
 
             fExternalFile = fileName;
@@ -126,10 +127,10 @@ namespace GKCore.Controllers
 
         public override void SetLocale()
         {
-            fView.Title = LangMan.LS(LSID.ToolOp_1);
+            fView.Title = LangMan.LS(LSID.TreeCompare);
 
             if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
-                GetControl<ITabPage>("pageTreeCompare").Text = LangMan.LS(LSID.ToolOp_1);
+                GetControl<ITabPage>("pageTreeCompare").Text = LangMan.LS(LSID.TreeCompare);
                 GetControl<IButton>("btnClose").Text = LangMan.LS(LSID.DlgClose);
             }
             GetControl<IGroupBox>("grpMatchType").Text = LangMan.LS(LSID.MatchType);
@@ -139,6 +140,13 @@ namespace GKCore.Controllers
             GetControl<IRadioButton>("radMathExternal").Text = LangMan.LS(LSID.MathExternal);
             GetControl<IRadioButton>("radAnalysis").Text = LangMan.LS(LSID.Analyze);
             GetControl<IButton>("btnMatch").Text = LangMan.LS(LSID.Match);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnClose").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

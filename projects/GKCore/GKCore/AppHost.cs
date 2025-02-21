@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -59,11 +59,11 @@ namespace GKCore
     /// </summary>
     public abstract class AppHost : IHost, ISingleInstanceEnforcer
     {
-        #if CI_MODE
+#if CI_MODE
         public static bool TEST_MODE = true;
-        #else
+#else
         public static bool TEST_MODE = false;
-        #endif
+#endif
 
 
         private static string fAppSign;
@@ -80,6 +80,7 @@ namespace GKCore
         private ITimer fAutosaveTimer;
         private string[] fCommandArgs;
         private int fLoadingCount;
+        private LocalesCollection fLocalesCollection;
 
 
         public static AppHost Instance
@@ -93,9 +94,9 @@ namespace GKCore
             get { return fActiveWidgets; }
         }
 
-        public IList<IWindow> RunningForms
+        public LocalesCollection LocalesCollection
         {
-            get { return fRunningForms; }
+            get { return fLocalesCollection; }
         }
 
 
@@ -107,16 +108,19 @@ namespace GKCore
             fInternalClipboard = new List<object>();
             fRunningForms = new List<IWindow>();
             fTips = new StringList();
+            fLocalesCollection = new LocalesCollection();
+        }
+
+        protected virtual void ApplicationExit()
+        {
+            AppHost.Instance.SaveLastBases();
         }
 
         private void AutosaveTimer_Tick(object sender, EventArgs e)
         {
             try {
-                foreach (IWindow win in fRunningForms) {
-                    var baseWin = win as IBaseWindow;
-                    if (baseWin != null) {
-                        baseWin.CheckAutosave();
-                    }
+                foreach (var baseWin in GetRunningForms<IBaseWindow>()) {
+                    baseWin.CheckAutosave();
                 }
             } catch (Exception ex) {
                 Logger.WriteError("AppHost.AutosaveTimer_Tick()", ex);
@@ -126,6 +130,8 @@ namespace GKCore
         public static void LogSysInfo()
         {
             try {
+                Logger.WriteInfo("OS Version: " + SysUtils.GetOSType().ToString());
+
 #if MONO
                 Logger.WriteInfo("Mono Version: " + SysUtils.GetMonoVersion());
 #endif
@@ -141,15 +147,15 @@ namespace GKCore
             }
         }
 
-        public virtual void Init(string[] args, bool isMDI)
+        public virtual async Task Init(string[] args, bool isMDI)
         {
             GKUtils.InitGEDCOM();
-            LoadLanguage(AppHost.Options.InterfaceLang);
+            await LoadLanguage(AppHost.Options.InterfaceLang, true);
             SetArgs(args);
             StartupWork();
         }
 
-        public virtual void StartupWork()
+        public virtual async void StartupWork()
         {
             if (HasFeatureSupport(Feature.Themes)) {
                 ThemeManager.LoadThemes();
@@ -162,16 +168,18 @@ namespace GKCore
                 try {
                     BeginLoading();
 
-                    int result = LoadArgs(false);
-                    result += ReloadRecentBases();
+                    int result = await LoadArgs(false);
+                    result += await ReloadRecentBases();
                     if (result == 0) {
-                        CreateBase("");
+                        await CreateBase("");
                     }
 
                     ProcessHolidays();
                     ProcessTips();
+                    ProcessLocales();
+
+                    await EndLoading();
                 } finally {
-                    EndLoading();
                 }
 
                 if (Options.AutoCheckUpdates) {
@@ -203,11 +211,20 @@ namespace GKCore
             }
         }
 
+        public virtual IEnumerable<T> GetRunningForms<T>() where T : class
+        {
+            for (int i = 0, num = fRunningForms.Count; i < num; i++) {
+                T form = fRunningForms[i] as T;
+                if (form != null) {
+                    yield return form;
+                }
+            }
+        }
+
         public string GetCurrentFileName()
         {
             IBaseWindow cb = GetCurrentFile();
-            string result = ((cb == null) ? "" : cb.Context.FileName);
-            return result;
+            return (cb == null) ? "" : cb.Context.FileName;
         }
 
         public void BeginLoading()
@@ -215,29 +232,32 @@ namespace GKCore
             fLoadingCount++;
         }
 
-        public void EndLoading()
+        public async Task EndLoading()
         {
             fLoadingCount--;
 
             if (fLoadingCount == 0) {
-                ShowTips();
+                await ShowTips();
             }
         }
 
-        public void ShowTips()
+        public async Task ShowTips()
         {
             if (fTips.Count <= 0) return;
 
             using (var dlg = fIocContainer.Resolve<IDayTipsDlg>()) {
                 dlg.Init(LangMan.LS(LSID.BirthDays), AppHost.Options.ShowTips, fTips);
-                ShowModalX(dlg, null, false);
+                await ShowModalAsync(dlg, null, false);
                 AppHost.Options.ShowTips = dlg.ShowTipsChecked;
             }
 
             fTips.Clear();
         }
 
-        public abstract void Activate();
+        public virtual void Activate()
+        {
+            // May have a desktop-only implementation
+        }
 
         public abstract IForm GetActiveForm();
 
@@ -252,7 +272,10 @@ namespace GKCore
             }
         }
 
-        public abstract void EnableWindow(IWidgetForm form, bool value);
+        public virtual void EnableWindow(IWidgetForm form, bool value)
+        {
+            // May have a desktop-only implementation
+        }
 
         public MRUFile GetMRUFile(IBaseWindow baseWin)
         {
@@ -286,34 +309,30 @@ namespace GKCore
             if (mf != null) RestoreWinState(baseWin, mf);
         }
 
-        protected void UpdateLang()
+        protected virtual void UpdateLang()
         {
-            foreach (IWindow win in fRunningForms) {
+            foreach (var win in GetRunningForms<IWindow>()) {
                 win.SetLocale();
             }
         }
 
         protected void UpdateMRU()
         {
-            foreach (IWindow win in fRunningForms) {
-                if (win is IBaseWindow) {
-                    ((IBaseWindow)win).UpdateMRU();
-                }
+            foreach (var baseWin in GetRunningForms<IBaseWindow>()) {
+                baseWin.UpdateMRU();
             }
         }
 
         public void SaveLastBases()
         {
-            #if !CI_MODE
-            AppHost.Options.LastBases.Clear();
+#if !CI_MODE
+            var lastBases = AppHost.Options.LastBases;
 
-            foreach (IWindow win in fRunningForms) {
-                var baseWin = win as IBaseWindow;
-                if (baseWin != null) {
-                    AppHost.Options.LastBases.Add(baseWin.Context.FileName);
-                }
+            lastBases.Clear();
+            foreach (var baseWin in GetRunningForms<IBaseWindow>()) {
+                lastBases.Add(baseWin.Context.FileName);
             }
-            #endif
+#endif
         }
 
         public virtual int GetKeyLayout()
@@ -338,6 +357,12 @@ namespace GKCore
         public virtual void LayoutWindows(WinLayout layout)
         {
             // May have a desktop-only implementation
+        }
+
+        public virtual string GetExternalStorageDirectory()
+        {
+            // May have a mobile-only implementation
+            throw new NotImplementedException();
         }
 
         #region Extended clipboard functions
@@ -459,6 +484,18 @@ namespace GKCore
             return path;
         }
 
+        public static void CleanImagesCache()
+        {
+            string path = GetCachePath();
+
+            DirectoryInfo dir = new DirectoryInfo(path);
+            foreach (FileInfo fi in dir.GetFiles()) {
+                try {
+                    fi.Delete();
+                } catch (Exception) { } // Ignore all exceptions
+            }
+        }
+
         public static string GetLogFilename()
         {
             string path = GetAppDataPathStatic() + "GEDKeeper2.log";
@@ -469,12 +506,15 @@ namespace GKCore
 
         #region IHost implementation
 
-        public abstract void CloseDependentWindows(IWindow owner);
+        public virtual void CloseDependentWindows(IWindow owner)
+        {
+            // May have a desktop-only implementation
+        }
 
         public IWorkWindow GetWorkWindow()
         {
             IWindow activeWnd = GetActiveWindow();
-            return (activeWnd is IWorkWindow) ? (IWorkWindow) activeWnd : null;
+            return (activeWnd is IWorkWindow) ? (IWorkWindow)activeWnd : null;
         }
 
         public virtual IBaseWindow GetCurrentFile(bool extMode = false)
@@ -540,6 +580,36 @@ namespace GKCore
         }
 
         public abstract ExtRect GetActiveScreenWorkingArea();
+
+        public abstract void SetWindowBounds(IWindow window, ExtRect bounds);
+
+        public void SetWindowBounds(IWindow window, ChartWindowsShowMode mode)
+        {
+            var scrBounds = GetActiveScreenWorkingArea();
+
+            switch (mode) {
+                case ChartWindowsShowMode.Default:
+                    break;
+
+                case ChartWindowsShowMode.Maximize:
+                    SetWindowBounds(window, scrBounds);
+                    break;
+
+                case ChartWindowsShowMode.LeftHalf: {
+                        int half = scrBounds.Width / 2;
+                        var halfBounds = new ExtRect(scrBounds.Left, scrBounds.Top, half, scrBounds.Height);
+                        SetWindowBounds(window, halfBounds);
+                    }
+                    break;
+
+                case ChartWindowsShowMode.RightHalf: {
+                        int half = scrBounds.Width / 2;
+                        var halfBounds = new ExtRect(scrBounds.Left + half, scrBounds.Top, half, scrBounds.Height);
+                        SetWindowBounds(window, halfBounds);
+                    }
+                    break;
+            }
+        }
 
         public virtual void WidgetLocate(IWidgetForm view, WidgetLocation location)
         {
@@ -651,18 +721,6 @@ namespace GKCore
             }
         }
 
-        public bool ShowDialog<T>(IView owner, bool keepModeless = false) where T : ICommonDialog
-        {
-            using (var dlg = AppHost.Container.Resolve<T>(owner)) {
-                return ShowModalX(dlg, owner, keepModeless);
-            }
-        }
-
-        public virtual bool ShowModalX(ICommonDialog dialog, IView owner, bool keepModeless = false)
-        {
-            return (dialog != null && dialog.ShowModalX(owner));
-        }
-
         public virtual async Task<bool> ShowModalAsync(ICommonDialog dialog, IView owner, bool keepModeless = false)
         {
             return false;
@@ -673,20 +731,27 @@ namespace GKCore
             string lngSign = AppHost.Options.GetLanguageSign();
             if (string.IsNullOrEmpty(lngSign)) return;
 
-            string helpPath = GKUtils.GetHelpPath(lngSign);
-
             if (string.IsNullOrEmpty(topic)) {
-                topic = helpPath + "GEDKeeper.html";
+                topic = "GEDKeeper.html";
+            }
+            string topicWL = "help_" + lngSign + "/" + topic;
+
+            if (!HasFeatureSupport(Feature.Mobile)) {
+                string topicPath = GKUtils.GetLangsPath() + topicWL;
+                if (!File.Exists(topicPath)) {
+                    AppHost.StdDialogs.ShowError(LangMan.LS(LSID.HelpIsNotAvailable));
+                    topicWL = "help_enu/" + topic;
+                    topicPath = GKUtils.GetLangsPath() + topicWL;
+                }
+                GKUtils.LoadExtFile(topicPath);
             } else {
-                topic = helpPath + topic;
+                string topicURL = GKData.APP_SITE + topicWL;
+                OpenURL(topicURL);
             }
+        }
 
-            if (!File.Exists(topic)) {
-                AppHost.StdDialogs.ShowError(@"For that language help is unavailable");
-                return;
-            }
-
-            GKUtils.LoadExtFile(topic);
+        public virtual void OpenURL(string uriString)
+        {
         }
 
         public string GetUserFilesPath(string filePath)
@@ -708,7 +773,7 @@ namespace GKCore
             }
         }
 
-        public virtual IBaseWindow CreateBase(string fileName)
+        public virtual async Task<IBaseWindow> CreateBase(string fileName)
         {
             IBaseWindow result = null;
 
@@ -733,8 +798,9 @@ namespace GKCore
                     }
 
                     RestoreWinMRU(result);
+
+                    await EndLoading();
                 } finally {
-                    EndLoading();
                 }
             } catch (Exception ex) {
                 Logger.WriteError("AppHost.CreateBase()", ex);
@@ -743,7 +809,7 @@ namespace GKCore
             return result;
         }
 
-        public void LoadBase(IBaseWindow baseWin, string fileName)
+        public async Task LoadBase(IBaseWindow baseWin, string fileName)
         {
             if (baseWin == null)
                 throw new ArgumentNullException(@"baseWin");
@@ -752,7 +818,7 @@ namespace GKCore
                 if (!HasFeatureSupport(Feature.Mobile)) {
                     // Multiple documents/bases
                     if (!baseWin.Context.IsUnknown() || !baseWin.Context.Tree.IsEmpty) {
-                        CreateBase(fileName);
+                        await CreateBase(fileName);
                         return;
                     }
 
@@ -776,8 +842,9 @@ namespace GKCore
                         ProcessLoaded(baseWin.Context);
                         RestoreWinMRU(baseWin);
                     }
+
+                    await EndLoading();
                 } finally {
-                    EndLoading();
                 }
             } catch (Exception ex) {
                 Logger.WriteError("AppHost.LoadBase()", ex);
@@ -788,11 +855,8 @@ namespace GKCore
         {
             IBaseWindow result = null;
 
-            int num = fRunningForms.Count;
-            for (int i = 0; i < num; i++) {
-                IBaseWindow baseWin = fRunningForms[i] as IBaseWindow;
-
-                if (baseWin != null && string.Equals(baseWin.Context.FileName, fileName)) {
+            foreach (var baseWin in GetRunningForms<IBaseWindow>()) {
+                if (string.Equals(baseWin.Context.FileName, fileName)) {
                     result = baseWin;
                     break;
                 }
@@ -803,14 +867,9 @@ namespace GKCore
 
         public void CriticalSave()
         {
-            try
-            {
-                int num = fRunningForms.Count;
-                for (int i = 0; i < num; i++) {
-                    IBaseWindow baseWin = fRunningForms[i] as IBaseWindow;
-                    if (baseWin != null) {
-                        baseWin.Context.CriticalSave();
-                    }
+            try {
+                foreach (var baseWin in GetRunningForms<IBaseWindow>()) {
+                    baseWin.Context.CriticalSave();
                 }
             } catch (Exception ex) {
                 Logger.WriteError("AppHost.CriticalSave()", ex);
@@ -821,7 +880,7 @@ namespace GKCore
         /// Verify and load the databases specified in the command line arguments.
         /// </summary>
         /// <returns>number of loaded files</returns>
-        public int LoadArgs(bool invoke)
+        public async Task<int> LoadArgs(bool invoke)
         {
             int result = 0;
             if (fCommandArgs != null && fCommandArgs.Length > 0) {
@@ -831,7 +890,7 @@ namespace GKCore
                             var baseWin = GetActiveWindow() as IBaseWindowView;
                             baseWin.LoadBase(arg);
                         } else {
-                            AppHost.Instance.CreateBase(arg);
+                            await AppHost.Instance.CreateBase(arg);
                         }
                         result += 1;
                     }
@@ -843,7 +902,7 @@ namespace GKCore
         /// <summary>
         /// Reload recently opened files at startup.
         /// </summary>
-        public int ReloadRecentBases()
+        public async Task<int> ReloadRecentBases()
         {
             int result = 0;
             if (!GlobalOptions.Instance.LoadRecentFiles) return result;
@@ -851,19 +910,31 @@ namespace GKCore
             try {
                 BeginLoading();
 
-                int num = AppHost.Options.LastBases.Count;
+                var lastBases = AppHost.Options.LastBases;
+
+                int num = lastBases.Count;
                 for (int i = 0; i < num; i++) {
-                    string lb = AppHost.Options.LastBases[i];
+                    string lb = lastBases[i];
                     if (File.Exists(lb)) {
-                        AppHost.Instance.CreateBase(lb);
+                        await AppHost.Instance.CreateBase(lb);
                         result += 1;
                     }
                 }
+
+                await EndLoading();
             } finally {
-                EndLoading();
             }
 
             return result;
+        }
+
+        public void ProcessLocales()
+        {
+            try {
+                fLocalesCollection.Load(GKUtils.GetLangsPath() + "locales.yaml");
+            } catch (Exception ex) {
+                Logger.WriteError("AppHost.ProcessLocales()", ex);
+            }
         }
 
         public void ProcessHolidays()
@@ -907,12 +978,8 @@ namespace GKCore
 
         public void UpdateControls(bool forceDeactivate, bool blockDependent = false)
         {
-            int num = fRunningForms.Count;
-            for (int i = 0; i < num; i++) {
-                IBaseWindow baseWin = fRunningForms[i] as IBaseWindow;
-                if (baseWin != null) {
-                    baseWin.UpdateControls(forceDeactivate, blockDependent);
-                }
+            foreach (var baseWin in GetRunningForms<IBaseWindow>()) {
+                baseWin.UpdateControls(forceDeactivate, blockDependent);
             }
         }
 
@@ -921,11 +988,11 @@ namespace GKCore
             // dummy
         }
 
-        public static ushort RequestLanguage()
+        public static async Task<ushort> RequestLanguage()
         {
             if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
                 using (var dlg = AppHost.ResolveDialog<ILanguageSelectDlg>()) {
-                    if (AppHost.Instance.ShowModalX(dlg, null, false)) {
+                    if (await AppHost.Instance.ShowModalAsync(dlg, null, false)) {
                         return (ushort)dlg.SelectedLanguage;
                     }
                 }
@@ -934,14 +1001,19 @@ namespace GKCore
             return LangMan.LS_DEF_CODE;
         }
 
-        public void LoadLanguage(int langCode)
+        public async Task LoadLanguage(int langCode, bool startup)
         {
             try {
                 if (langCode <= 0) {
-                    langCode = RequestLanguage();
+                    langCode = await RequestLanguage();
                 }
 
+                if (!startup) DoneEventDefs();
+
                 AppHost.Options.LoadLanguage(langCode);
+
+                InitEventDefs();
+
                 AppHost.Plugins.OnLanguageChange();
 
                 UpdateLang();
@@ -1042,12 +1114,12 @@ namespace GKCore
             ShowOptions(owner, page);
         }
 
-        public void ShowOptions(IView owner, OptionsPage page)
+        public async void ShowOptions(IView owner, OptionsPage page)
         {
             using (var dlg = AppHost.ResolveDialog<IOptionsDlg>(AppHost.Instance)) {
                 dlg.SetPage(page);
 
-                if (AppHost.Instance.ShowModalX(dlg, owner)) {
+                if (await AppHost.Instance.ShowModalAsync(dlg, owner)) {
                     AppHost.Instance.ApplyOptions();
                 }
             }
@@ -1063,10 +1135,8 @@ namespace GKCore
             }
             fAutosaveTimer.Enabled = AppHost.Options.Autosave;
 
-            foreach (IWindow win in fRunningForms) {
-                if (win is IWorkWindow) {
-                    (win as IWorkWindow).UpdateSettings();
-                }
+            foreach (var win in GetRunningForms<IWorkWindow>()) {
+                win.UpdateSettings();
             }
         }
 
@@ -1078,11 +1148,8 @@ namespace GKCore
             ThemeManager.SetTheme(name);
             GlobalOptions.Instance.Theme = name;
 
-            foreach (IWindow win in fRunningForms) {
-                IThemedView themedView = win as IThemedView;
-                if (themedView != null) {
-                    themedView.ApplyTheme();
-                }
+            foreach (var themedView in GetRunningForms<IThemedView>()) {
+                themedView.ApplyTheme();
             }
         }
 
@@ -1120,7 +1187,7 @@ namespace GKCore
 
         void ISingleInstanceEnforcer.OnMessageReceived(MessageEventArgs e)
         {
-            OnMessageReceivedInvoker invoker = delegate(MessageEventArgs eventArgs) {
+            OnMessageReceivedInvoker invoker = delegate (MessageEventArgs eventArgs) {
                 try {
                     string msg = eventArgs.Message as string;
 
@@ -1153,6 +1220,7 @@ namespace GKCore
 
         private static readonly IocContainer fIocContainer;
 
+        private static EventDefinitions fEventDefinitions;
         private static ExtResources fExtResources;
         private static IGraphicsProvider fGfxProvider;
         private static INamesTable fNamesTable;
@@ -1165,6 +1233,16 @@ namespace GKCore
         public static IocContainer Container
         {
             get { return fIocContainer; }
+        }
+
+        public static EventDefinitions EventDefinitions
+        {
+            get {
+                if (fEventDefinitions == null) {
+                    fEventDefinitions = new EventDefinitions();
+                }
+                return fEventDefinitions;
+            }
         }
 
         public static ExtResources ExtResources
@@ -1305,6 +1383,8 @@ namespace GKCore
         {
             NamesTable.SaveToFile(GetAppDataPathStatic() + "GEDKeeper2.nms");
 
+            DoneEventDefs();
+
             var options = GlobalOptions.Instance;
             options.SaveToFile(GetAppDataPathStatic() + "GEDKeeper2.ini");
 
@@ -1313,6 +1393,23 @@ namespace GKCore
                 options.Dispose();
                 Plugins.Unload();
             }
+        }
+
+        private static string GetEventDefsFileName()
+        {
+            string lang_sign = GlobalOptions.Instance.GetLanguageSign();
+            string result = string.Format(GetAppDataPathStatic() + "event_defs_{0}.yaml", lang_sign);
+            return result;
+        }
+
+        private static void InitEventDefs()
+        {
+            EventDefinitions.Load(GetEventDefsFileName());
+        }
+
+        private static void DoneEventDefs()
+        {
+            EventDefinitions.Save(GetEventDefsFileName());
         }
 
         public static void ForceGC()

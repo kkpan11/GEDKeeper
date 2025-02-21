@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.Security;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -171,16 +172,15 @@ namespace GKMap.MapProviders
         /// </summary>
         public bool InvertedAxisY = false;
 
-        public static string LanguageStr
-        {
-            get {
-                return fLanguageStr;
-            }
-        }
-
         /// <summary>
         /// map language
         /// </summary>
+        public static string LanguageStr
+        {
+            get { return fLanguageStr; }
+            set { fLanguageStr = value; }
+        }
+
         public static LanguageType Language
         {
             get {
@@ -227,6 +227,16 @@ namespace GKMap.MapProviders
 
         private WebRequest GetRequest(string url)
         {
+            /*
+             * Solution for exception on Xamarin:
+             * System.Net.WebException: Error: TrustFailure (Authentication failed, see inner exception.)
+             * System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+             * Mono.Btls.MonoBtlsException: Ssl error:1000007d:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED
+             */
+            ServicePointManager.ServerCertificateValidationCallback = new RemoteCertificateValidationCallback(
+               delegate { return true; }
+            );
+
             WebRequest request = IsSocksProxy ? SocksHttpWebRequest.Create(url) : WebRequest.Create(url);
 
             if (WebProxy != null) {

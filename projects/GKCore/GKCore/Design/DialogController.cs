@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,6 +19,7 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using GDModel;
 using GKCore.Interfaces;
 using GKCore.Operations;
@@ -47,9 +48,9 @@ namespace GKCore.Design
             return true;
         }
 
-        public virtual bool Cancel()
+        public virtual async Task<bool> Cancel()
         {
-            if (CheckChangesPersistence()) {
+            if (await CheckChangesPersistence()) {
                 return false;
             }
 
@@ -78,13 +79,20 @@ namespace GKCore.Design
         /// Check the persistence of changes, the need to save or cancel them.
         /// </summary>
         /// <returns>if `true`, discard dialog closing events</returns>
-        public bool CheckChangesPersistence()
+        public async Task<bool> CheckChangesPersistence()
         {
+            bool result;
             if (GlobalOptions.Instance.DialogClosingWarn && fLocalUndoman != null && fLocalUndoman.HasChanges()) {
-                return (AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.WarningOfDialogUnsavedChanges)));
+                result = (await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.WarningOfDialogUnsavedChanges)));
             } else {
-                return false;
+                result = false;
             }
+
+            if (!result) {
+                Done();
+            }
+
+            return result;
         }
 
         public override void Init(IBaseWindow baseWin)

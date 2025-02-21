@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2020 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -22,6 +22,42 @@ using System;
 
 namespace GDModel.Providers.GEDCOM
 {
+    /// <summary>
+    /// Introduced as a stripped-down analogue of Span&lt;char&gt; to minimize memory allocations
+    /// when passing tag values between parsing methods.
+    /// </summary>
+    public struct StringSpan
+    {
+        public static readonly StringSpan Empty = new StringSpan(null, 0, 0);
+
+        public readonly char[] Data;
+        public readonly int Length;
+        public readonly int Pos;
+
+        public bool IsEmpty
+        {
+            get { return (Data == null || Length == 0); }
+        }
+
+        // :this() for compatibility with the old assembly chain
+        public StringSpan(char[] data, int length, int pos) : this()
+        {
+            Data = data;
+            Length = length; // full length of data in line buffer
+            Pos = pos; // current position between 0 and length
+        }
+
+        public static implicit operator string(StringSpan span)
+        {
+            return (span.Data == null || span.Length == 0) ? string.Empty : new string(span.Data, span.Pos, span.Length - span.Pos);
+        }
+
+        public static implicit operator StringSpan(string str)
+        {
+            return (string.IsNullOrEmpty(str)) ? StringSpan.Empty : new StringSpan(str.ToCharArray(), str.Length, 0);
+        }
+    }
+
     public enum GEDCOMToken
     {
         Unknown,
@@ -42,6 +78,8 @@ namespace GDModel.Providers.GEDCOM
     /// </remarks>
     public sealed class GEDCOMParser
     {
+        public static readonly GEDCOMParser Default = new GEDCOMParser(false);
+
         private const char EOL = (char)0;
 
         private GEDCOMToken fCurrentToken;
@@ -93,27 +131,34 @@ namespace GDModel.Providers.GEDCOM
             Reset(data.ToCharArray(), 0, data.Length);
         }
 
-        public GEDCOMParser(char[] data, int startIndex, int length, bool ignoreWhitespace)
+        public GEDCOMParser(StringSpan strSpan, bool ignoreWhitespace)
         {
-            if (data == null)
-                throw new ArgumentNullException("data");
-
             fIgnoreWhitespace = ignoreWhitespace;
 
-            Reset(data, startIndex, length);
+            Reset(strSpan);
         }
 
         public void Reset(char[] data, int startIndex, int length)
         {
             fData = data;
+            fPos = startIndex;
             fLength = length;
 
             fCurrentToken = GEDCOMToken.Unknown;
-            fPos = startIndex;
             fValueReset = false;
         }
 
-        public GEDCOMToken Next()
+        public void Reset(StringSpan strSpan)
+        {
+            fData = strSpan.Data;
+            fPos = strSpan.Pos;
+            fLength = strSpan.Length;
+
+            fCurrentToken = GEDCOMToken.Unknown;
+            fValueReset = false;
+        }
+
+        public GEDCOMToken Next(bool skipOneSpace = false)
         {
             while (true) {
                 char ch = (fPos >= fLength) ? EOL : fData[fPos];
@@ -164,12 +209,15 @@ namespace GDModel.Providers.GEDCOM
 
                     fSavePos = fPos;
                     fPos++;
-                    while (true) {
-                        ch = (fPos >= fLength) ? EOL : fData[fPos];
-                        if (ch == ' ' || ch == '\t')
-                            fPos++;
-                        else
-                            break;
+
+                    if (!skipOneSpace) {
+                        while (true) {
+                            ch = (fPos >= fLength) ? EOL : fData[fPos];
+                            if (ch == ' ' || ch == '\t')
+                                fPos++;
+                            else
+                                break;
+                        }
                     }
 
                     fTokenEnd = fPos;
@@ -212,11 +260,7 @@ namespace GDModel.Providers.GEDCOM
 
         public void SkipWhitespaces()
         {
-            if (fCurrentToken == GEDCOMToken.Unknown) {
-                Next();
-            }
-
-            while (fCurrentToken == GEDCOMToken.Whitespace) {
+            while (fCurrentToken <= GEDCOMToken.Whitespace) {
                 Next();
             }
         }
@@ -245,9 +289,19 @@ namespace GDModel.Providers.GEDCOM
             return (fPos >= fLength) ? string.Empty : new string(fData, fPos, fLength - fPos);
         }
 
+        public StringSpan GetRestSpan()
+        {
+            return new StringSpan(fData, fLength, fPos);
+        }
+
         public string GetFullStr()
         {
             return new string(fData, 0, fLength);
+        }
+
+        public StringSpan GetFullSpan()
+        {
+            return new StringSpan(fData, fLength, 0);
         }
 
         public bool RequireToken(GEDCOMToken tokenKind)

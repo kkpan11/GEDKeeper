@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,14 +19,16 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GKCore.Charts;
-using GKCore.Design.Controls;
-using GKCore.Lists;
 using GKCore.Design;
+using GKCore.Design.Controls;
 using GKCore.Design.Views;
+using GKCore.Lists;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -81,10 +83,10 @@ namespace GKCore.Controllers
             }
         }
 
-        public override bool Cancel()
+        public override async Task<bool> Cancel()
         {
             fFilter.Reset();
-            return true;
+            return await Task.FromResult(true);
         }
 
         public override void UpdateView()
@@ -130,13 +132,13 @@ namespace GKCore.Controllers
             }
         }
 
-        public void ModifyPersons(RecordAction action, object itemData)
+        public async Task ModifyPersons(RecordAction action, object itemData)
         {
             GDMIndividualRecord iRec = itemData as GDMIndividualRecord;
 
             switch (action) {
                 case RecordAction.raAdd:
-                    iRec = fBase.Context.SelectPerson(fView, null, TargetMode.tmNone, GDMSex.svUnknown);
+                    iRec = await fBase.Context.SelectPerson(fView, null, TargetMode.tmNone, GDMSex.svUnknown);
                     if (iRec != null) {
                         fTemp = fTemp + iRec.XRef + ";";
                     }
@@ -200,6 +202,16 @@ namespace GKCore.Controllers
             GetControl<ILabel>("lblRPSources").Text = LangMan.LS(LSID.RPSources);
 
             fView.PersonsList.ListView.AddColumn(LangMan.LS(LSID.RPIndividuals), 350, false);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
+
+            fView.PersonsList.ApplyTheme();
         }
     }
 }

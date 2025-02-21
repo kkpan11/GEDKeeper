@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,7 @@ using GKCore;
 using GKCore.Design.Controls;
 using GKCore.Lists;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKUI.Components
 {
@@ -44,6 +45,7 @@ namespace GKUI.Components
         private readonly ToolStripButton fBtnCut;
         private readonly ToolStripButton fBtnPaste;
         private readonly ToolStrip fToolBar;
+        private readonly ContextMenuStrip fContextMenu;
         private readonly GKListView fList;
 
         private EnumSet<SheetButton> fButtons;
@@ -77,12 +79,17 @@ namespace GKUI.Components
                     if (fListModel != null) {
                         fListModel.SheetList = null;
                     }
+                    fList.ContextMenuStrip = null;
 
                     fListModel = value;
 
                     if (fListModel != null) {
                         fList.ListMan = fListModel;
                         fListModel.SheetList = this;
+
+                        if (fListModel.AllowedActions.Contains(RecordAction.raDetails)) {
+                            fList.ContextMenuStrip = fContextMenu;
+                        }
                     }
                 }
 
@@ -123,6 +130,13 @@ namespace GKUI.Components
             fToolBar.AutoSize = true;
             fToolBar.ShowItemToolTips = true;
 
+            var miDetails = new ToolStripMenuItem();
+            miDetails.Text = LangMan.LS(LSID.Details);
+            miDetails.Click += miDetails_Click;
+
+            fContextMenu = new ContextMenuStrip();
+            fContextMenu.Items.AddRange(new ToolStripItem[] { miDetails });
+
             fList = new GKListView();
             fList.Dock = DockStyle.Fill;
             fList.Location = new Point(0, 0);
@@ -133,6 +147,7 @@ namespace GKUI.Components
             fList.View = View.Details;
             fList.DoubleClick += List_DoubleClick;
             fList.KeyDown += List_KeyDown;
+            fList.SelectedIndexChanged += List_SelectedIndexChanged;
 
             SuspendLayout();
             Controls.Add(fList);
@@ -185,6 +200,19 @@ namespace GKUI.Components
             fList.UpdateContents();
         }
 
+        public void ApplyTheme()
+        {
+            UIHelper.SetButtonThemeImage(fBtnPaste, ThemeElement.Glyph_Paste);
+            UIHelper.SetButtonThemeImage(fBtnCut, ThemeElement.Glyph_Cut);
+            UIHelper.SetButtonThemeImage(fBtnCopy, ThemeElement.Glyph_Copy);
+            UIHelper.SetButtonThemeImage(fBtnMoveDown, ThemeElement.Glyph_MoveDown);
+            UIHelper.SetButtonThemeImage(fBtnMoveUp, ThemeElement.Glyph_MoveUp);
+            UIHelper.SetButtonThemeImage(fBtnLinkJump, ThemeElement.Glyph_LinkJump);
+            UIHelper.SetButtonThemeImage(fBtnDelete, ThemeElement.Glyph_ItemDelete);
+            UIHelper.SetButtonThemeImage(fBtnEdit, ThemeElement.Glyph_ItemEdit);
+            UIHelper.SetButtonThemeImage(fBtnAdd, ThemeElement.Glyph_ItemAdd);
+        }
+
         /// <summary>
         /// The library NUnitForms has a bug in the class Finder.
         /// So we need unique names for hierarchical included components.
@@ -216,7 +244,7 @@ namespace GKUI.Components
             return btn;
         }
 
-        private void UpdateButtons()
+        public void UpdateButtons()
         {
             if (fListModel == null) {
                 fBtnAdd.Visible = fButtons.Contains(SheetButton.lbAdd);
@@ -257,6 +285,27 @@ namespace GKUI.Components
             fBtnPaste.Enabled = !fReadOnly;
 
             fList.BackColor = (fReadOnly) ? SystemColors.Control : SystemColors.Window;
+        }
+
+        private void List_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (fListModel != null) {
+                int itemIndex = -1; // fList.SelectedIndex;
+                object itemData = fList.GetSelectedData();
+                if (itemData == null) return;
+
+                fListModel.OnItemSelected(itemIndex, itemData);
+            }
+        }
+
+        private void miDetails_Click(object sender, EventArgs e)
+        {
+            if (fListModel != null) {
+                object itemData = fList.GetSelectedData();
+                if (itemData != null) {
+                    fListModel.ShowDetails(itemData);
+                }
+            }
         }
 
         private void List_DoubleClick(object sender, EventArgs e)

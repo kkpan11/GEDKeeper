@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -121,6 +121,11 @@ namespace GKUI.Forms
         private ButtonMenuItem miContRecordDelete;
         private ButtonMenuItem miContRecordEdit;
         private ButtonMenuItem miContRecordMerge;
+        private ButtonMenuItem miContMediaMoveFile2Abs;
+        private ButtonMenuItem miContMediaMoveFile2Rel;
+        private ButtonMenuItem miContMediaMoveFile2Arc;
+        private ButtonMenuItem miContMediaMoveFile2Stg;
+        private ButtonMenuItem miContMediaMoveFile;
         private ContextMenu contextMenu;
         private ButtonMenuItem miContRecordAdd;
         private ButtonMenuItem miTreeCompare;
@@ -139,7 +144,9 @@ namespace GKUI.Forms
         private ButtonMenuItem miWinMinimize;
         private ContextMenu summaryMenu;
         private ButtonMenuItem miCopyContent;
-
+        private ButtonMenuItem miPhotosBatchAdding;
+        private ButtonMenuItem miCleanImagesCache;
+        private ButtonToolItem tbPartialView;
 
 #pragma warning restore CS0169, CS0649, IDE0044, IDE0051
         #endregion
@@ -224,13 +231,20 @@ namespace GKUI.Forms
 
         private void InitializeComponent()
         {
+            miContMediaMoveFile2Abs = new ButtonMenuItem(miContMediaMoveFile_Click);
+            miContMediaMoveFile2Rel = new ButtonMenuItem(miContMediaMoveFile_Click);
+            miContMediaMoveFile2Arc = new ButtonMenuItem(miContMediaMoveFile_Click);
+            miContMediaMoveFile2Stg = new ButtonMenuItem(miContMediaMoveFile_Click);
+            miContMediaMoveFile = new ButtonMenuItem();
+            miContMediaMoveFile.Items.AddRange(new MenuItem[] { miContMediaMoveFile2Abs, miContMediaMoveFile2Rel, miContMediaMoveFile2Arc, miContMediaMoveFile2Stg });
+
             miContRecordAdd = new ButtonMenuItem(miRecordAdd_Click);
             miContRecordEdit = new ButtonMenuItem(miRecordEdit_Click);
             miContRecordDelete = new ButtonMenuItem(miRecordDelete_Click);
             miContRecordDuplicate = new ButtonMenuItem(miRecordDuplicate_Click);
             miContRecordMerge = new ButtonMenuItem(miRecordMerge_Click);
             contextMenu = new ContextMenu();
-            contextMenu.Items.AddRange(new MenuItem[] { miContRecordAdd, miContRecordEdit, miContRecordDelete, miContRecordDuplicate, miContRecordMerge });
+            contextMenu.Items.AddRange(new MenuItem[] { miContRecordAdd, miContRecordEdit, miContRecordDelete, miContRecordDuplicate, miContRecordMerge, miContMediaMoveFile });
             contextMenu.Opening += contextMenu_Opening;
 
             miCopyContent = new ButtonMenuItem(miCopyContent_Click);
@@ -249,6 +263,7 @@ namespace GKUI.Forms
             recView.AllowMultipleSelection = true;
             recView.MouseDoubleClick += miRecordEdit_Click;
             recView.SelectedItemsChanged += List_SelectedIndexChanged;
+            recView.KeyDown += Form_KeyDown;
             recView.ContextMenu = contextMenu;
             recView.ListMan = RecordsListModel<GDMRecord>.Create(fContext, recType, false);
             recView.UpdateContents();
@@ -341,13 +356,52 @@ namespace GKUI.Forms
 
         private void Form_KeyDown(object sender, KeyEventArgs e)
         {
+            switch (e.Key) {
+                /*case Keys.I:
+                    ItemAdd();
+                    break;
+                case Keys.D:
+                    ItemDelete();
+                    break;*/
+
+                case Keys.Enter:
+                    if (e.Control) {
+                        EditRecord();
+                        e.Handled = true;
+                    }
+                    break;
+
+                case Keys.Home:
+                case Keys.End:
+                    if (sender is GKListView) {
+                        var listView = sender as GKListView;
+                        if (e.Key == Keys.Home) {
+                            listView.SelectedIndex = 0;
+                        } else {
+                            listView.SelectedIndex = -1;
+                        }
+                        e.Handled = true;
+                    }
+                    break;
+
+                case Keys.F12:
+                    break;
+
+                /*case Keys.F:
+                    if (e.Control) {
+                        QuickFind();
+                    }
+                    break;*/
+            }
         }
 
         private void contextMenu_Opening(object sender, EventArgs e)
         {
-            IListView recView = GetRecordsViewByType(GetSelectedRecordType());
+            var recType = GetSelectedRecordType();
+            miContRecordDuplicate.Enabled = (recType == GDMRecordType.rtIndividual || recType == GDMRecordType.rtLocation);
 
-            miContRecordDuplicate.Enabled = (recView == fController.GetRecordsViewByType(GDMRecordType.rtIndividual));
+            miContMediaMoveFile.Visible = (recType == GDMRecordType.rtMultimedia);
+            miContMediaMoveFile2Abs.Enabled = false;
         }
 
         private void miRecordAdd_Click(object sender, EventArgs e)
@@ -382,6 +436,28 @@ namespace GKUI.Forms
             }
         }
 
+        private void miContMediaMoveFile_Click(object sender, EventArgs e)
+        {
+            MediaStoreType storeType;
+            if (sender == miContMediaMoveFile2Abs) {
+                storeType = MediaStoreType.mstReference;
+            } else if (sender == miContMediaMoveFile2Rel) {
+                storeType = MediaStoreType.mstRelativeReference;
+            } else if (sender == miContMediaMoveFile2Arc) {
+                storeType = MediaStoreType.mstArchive;
+            } else if (sender == miContMediaMoveFile2Stg) {
+                storeType = MediaStoreType.mstStorage;
+            } else {
+                return;
+            }
+
+            var recView = GetRecordsViewByType(GetSelectedRecordType()) as GKListView;
+            if (recView != null) {
+                var items = recView.GetSelectedItems();
+                fController.MoveMediaFiles(items, storeType);
+            }
+        }
+
         private void List_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (sender != null) {
@@ -398,13 +474,12 @@ namespace GKUI.Forms
 
         private void mPersonSummaryLink(object sender, string linkName)
         {
-            fController.SelectSummaryLink(linkName);
+            fController.SelectSummaryLink((IHyperView)sender, linkName);
         }
 
         private void miCopyContent_Click(object sender, EventArgs e)
         {
-            var hyperView = GetHyperViewByType(GetSelectedRecordType());
-            fController.CopyContent(hyperView);
+            fController.CopyContent();
         }
 
         #endregion
@@ -539,37 +614,7 @@ namespace GKUI.Forms
 
         public void ShowMedia(GDMMultimediaRecord mediaRec, bool modal)
         {
-            if (mediaRec == null)
-                throw new ArgumentNullException("mediaRec");
-
-            GDMFileReferenceWithTitle fileRef = mediaRec.FileReferences[0];
-            if (fileRef == null) return;
-
-            if (!GKUtils.UseEmbeddedViewer(fileRef.MultimediaFormat)) {
-                string targetFile = fContext.MediaLoad(fileRef);
-                GKUtils.LoadExtFile(targetFile);
-            } else {
-                //var mediaViewer = AppHost.Container.Resolve<IMediaViewerWin>(this);
-                MediaViewerWin mediaViewer = new MediaViewerWin(this);
-                try {
-                    try {
-                        mediaViewer.MultimediaRecord = mediaRec;
-                        // In v3.X, the media viewer cannot be a dialog.
-                        /*if (modal) {
-                            mediaViewer.Show();
-                        } else*/
-                        {
-                            mediaViewer.ShowInTaskbar = true;
-                            mediaViewer.Show();
-                        }
-                    } finally {
-                        //if (modal) mediaViewer.Dispose();
-                    }
-                } catch (Exception ex) {
-                    if (mediaViewer != null) mediaViewer.Dispose();
-                    Logger.WriteError("BaseWinSDI.ShowMedia()", ex);
-                }
-            }
+            BaseController.ShowMedia(this, mediaRec, modal);
         }
 
         #endregion
@@ -691,9 +736,9 @@ namespace GKUI.Forms
             fController.SelectRecordByXRef(xref, delayedTransition);
         }
 
-        public StringList GetRecordContent(GDMRecord record)
+        public StringList GetRecordContent(GDMRecord record, RecordContentType contentType)
         {
-            return fController.GetRecordContent(record);
+            return fController.GetRecordContent(record, contentType);
         }
 
         public bool RecordIsFiltered(GDMRecord record)
@@ -921,6 +966,16 @@ namespace GKUI.Forms
             fController.ShowFamilyGroups();
         }
 
+        private void miPhotosBatchAdding_Click(object sender, EventArgs e)
+        {
+            fController.ShowPhotosBatchAdding();
+        }
+
+        private void miCleanImagesCache_Click(object sender, EventArgs e)
+        {
+            AppHost.CleanImagesCache();
+        }
+
         private void miOptions_Click(object sender, EventArgs e)
         {
             AppHost.Instance.ShowOptions(this);
@@ -936,9 +991,9 @@ namespace GKUI.Forms
             fController.NewFile();
         }
 
-        private void miFileLoad_Click(object sender, EventArgs e)
+        private async void miFileLoad_Click(object sender, EventArgs e)
         {
-            fController.LoadFileEx();
+            await fController.LoadFileEx();
         }
 
         private void miFileSaveAs_Click(object sender, EventArgs e)
@@ -979,6 +1034,11 @@ namespace GKUI.Forms
         private void tbSendMail_Click(object sender, EventArgs e)
         {
             fController.SendMail();
+        }
+
+        private void tbPartialView_Click(object sender, EventArgs e)
+        {
+            fController.ShowPartialView();
         }
 
         private void miMap_Click(object sender, EventArgs e)
@@ -1033,12 +1093,12 @@ namespace GKUI.Forms
 
         private void miAncestorsCircle_Click(object sender, EventArgs e)
         {
-            fController.ShowCircleChart(CircleChartType.Ancestors);
+            BaseController.ShowCircleChart(this, CircleChartType.Ancestors);
         }
 
         private void miDescendantsCircle_Click(object sender, EventArgs e)
         {
-            fController.ShowCircleChart(CircleChartType.Descendants);
+            BaseController.ShowCircleChart(this, CircleChartType.Descendants);
         }
 
         private void miLogSend_Click(object sender, EventArgs e)

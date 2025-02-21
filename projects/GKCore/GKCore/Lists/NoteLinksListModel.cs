@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,13 +18,14 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GKCore.Controllers;
 using GKCore.Design;
 using GKCore.Interfaces;
 using GKCore.Operations;
+using GKCore.Options;
 using GKCore.Types;
 
 namespace GKCore.Lists
@@ -33,15 +34,22 @@ namespace GKCore.Lists
     {
         private GDMLines fNoteLines;
 
-        public NoteLinksListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        public NoteLinksListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete,
                 RecordAction.raMoveUp, RecordAction.raMoveDown);
+        }
 
-            fListColumns.AddColumn(LSID.NumberSym, 25, false);
-            fListColumns.AddColumn(LSID.Note, 500, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stNoteLinks);
+
+            result.AddColumn(LSID.NumberSym, 25, false);
+            result.AddColumn(LSID.Note, 500, false);
+
+            result.ResetDefaults();
+            return result;
         }
 
         public override void Fetch(GDMNotes aRec)
@@ -67,16 +75,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var dataOwner = fDataOwner as IGDMStructWithNotes;
-            if (dataOwner == null) return;
-
-            try {
+            if (dataOwner != null)
                 UpdateStructList(dataOwner.Notes);
-            } catch (Exception ex) {
-                Logger.WriteError("NoteLinksListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var dataOwner = fDataOwner as IGDMStructWithNotes;
             if (fBaseWin == null || dataOwner == null) return;
@@ -88,7 +91,7 @@ namespace GKCore.Lists
             GDMNoteRecord noteRec;
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                    noteRec = fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtNote, null) as GDMNoteRecord;
+                    noteRec = await fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtNote, null) as GDMNoteRecord;
                     if (noteRec != null) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otRecordNoteAdd, (GDMObject)dataOwner, noteRec);
                         notes = dataOwner.FindNotes(noteRec);
@@ -98,31 +101,20 @@ namespace GKCore.Lists
                 case RecordAction.raEdit:
                     if (notes != null) {
                         noteRec = fBaseContext.Tree.GetPtrValue<GDMNoteRecord>(notes);
-                        result = BaseController.ModifyNote(fOwner, fBaseWin, ref noteRec);
+                        var noteRes = await BaseController.ModifyNote(fOwner, fBaseWin, noteRec);
+                        result = noteRes.Result;
                     }
                     break;
 
                 case RecordAction.raDelete:
-                    if (AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachNoteQuery))) {
+                    if (await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachNoteQuery))) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otRecordNoteRemove, (GDMObject)dataOwner, notes);
                     }
                     break;
 
                 case RecordAction.raMoveUp:
                 case RecordAction.raMoveDown:
-                    {
-                        int idx = dataOwner.Notes.IndexOf(notes);
-                        switch (eArgs.Action) {
-                            case RecordAction.raMoveUp:
-                                dataOwner.Notes.Exchange(idx - 1, idx);
-                                break;
-
-                            case RecordAction.raMoveDown:
-                                dataOwner.Notes.Exchange(idx, idx + 1);
-                                break;
-                        }
-                        result = true;
-                    }
+                    result = dataOwner.Notes.Exchange(notes, eArgs.Action);
                     break;
             }
 

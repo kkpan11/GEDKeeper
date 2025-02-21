@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,6 +18,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -68,6 +69,17 @@ namespace GDModel
             }
         }
 
+        public override int GetHashCode()
+        {
+            var result = new HashCode();
+
+            for (int i = 0, num = base.Count; i < num; i++) {
+                result.Add(base[i]);
+            }
+
+            return result.ToHashCode();
+        }
+
         public bool IsEmpty()
         {
             return (base.Count <= 0) || (base.Count == 1 && (base[0] == "" || base[0] == LINE_BREAK));
@@ -84,6 +96,8 @@ namespace GDModel
         /// <summary>
         /// A function for safely platform-independent string splitting by newlines.
         /// Because in some UI (Eto.Forms) string on Windows may come with '\n' delimiter instead of '\r\n'.
+        ///
+        /// Variants: \n - Unix & Unix-like (including MacOSX aka macOS?), \r\n - Windows, \r - classic MacOS before 2001.
         /// </summary>
         private void ParseLine(string line)
         {
@@ -97,19 +111,24 @@ namespace GDModel
 
             int inPos = 0, inLen = line.Length;
             int outPos = 0, outLen = 0;
+            bool wasLF = false;
             while (true) {
                 char ch = (inPos >= inLen) ? '\0' : line[inPos];
                 inPos += 1;
 
-                if (ch == '\r' || ch == '\n' || ch == '\0') {
-                    if (outLen > 0) {
+                if (ch == '\n' || ch == '\0') {
+                    if (outLen > 0 || wasLF) {
                         string piece = line.Substring(outPos, outLen);
                         Add(piece);
                     }
                     outPos = inPos;
                     outLen = 0;
+                    wasLF = true;
+                } else if (ch == '\r') {
+                    // skipped
                 } else {
                     outLen += 1;
+                    wasLF = false;
                 }
 
                 if (ch == '\0') break;

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -24,6 +24,13 @@ using BSLib;
 
 namespace GKCore.Design.Graphics
 {
+    public enum ImageTarget
+    {
+        UI,
+        Chart
+    }
+
+
     /// <summary>
     /// Interface for platform-independent graphics rendering providers.
     /// </summary>
@@ -41,7 +48,9 @@ namespace GKCore.Design.Graphics
 
         IFont CreateFont(string fontName, float size, bool bold);
 
-        IImage LoadImage(Stream stream, int thumbWidth, int thumbHeight, ExtRect cutoutArea);
+        void FreeImage(ref IImage image);
+
+        IImage LoadImage(Stream stream, int thumbWidth, int thumbHeight, ExtRect cutoutArea, string cachedFile);
 
         /// <summary>
         /// Loading an image from a file (already cached by other functions or service images/icons of application).
@@ -49,8 +58,8 @@ namespace GKCore.Design.Graphics
         /// </summary>
         IImage LoadImage(string fileName);
 
-        IImage LoadResourceImage(Type baseType, string resName);
-        IImage LoadResourceImage(string resName, bool makeTransp = false);
+        IImage LoadResourceImage(Type baseType, string resName, ImageTarget target);
+        IImage LoadResourceImage(string resName, ImageTarget target, bool makeTransp = false);
 
         /// <summary>
         /// Saving portrait images for caching purposes.
@@ -60,5 +69,7 @@ namespace GKCore.Design.Graphics
         ExtSizeF GetTextSize(string text, IFont font, object target);
 
         string GetDefaultFontName();
+
+        float GetDefaultFontSize();
     }
 }

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -30,8 +30,8 @@ using GKCore.Types;
 [assembly: AssemblyTitle("GKNavigatorPlugin")]
 [assembly: AssemblyDescription("GEDKeeper Navigator plugin")]
 [assembly: AssemblyProduct("GEDKeeper")]
-[assembly: AssemblyCopyright("Copyright © 2016,2022-2023 by Sergey V. Zhdanovskih")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyCopyright("Copyright © 2016,2022-2025 by Sergey V. Zhdanovskih")]
+[assembly: AssemblyVersion("1.1.0.0")]
 [assembly: AssemblyCulture("")]
 
 #if DEBUG
@@ -52,28 +52,10 @@ namespace GKNavigatorPlugin
         Bookmarks,
         Languages,
         Records,
-
-        Individuals,
-        Families,
-        Notes,
-        Multimedia,
-        Sources,
-        Repositories,
-        Groups,
-        Researches,
-        Tasks,
-        Communications,
-        Locations,
-
-        Language,
-        Person,
-        Record,
         Time,
         Name,
         Action,
-        Filter,
-        Associations,
-        Relation,
+        WebLinks,
     }
 
     public sealed class Plugin : WidgetPlugin, ISubscriber

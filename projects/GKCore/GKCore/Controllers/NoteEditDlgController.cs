@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -20,11 +20,14 @@
 
 using System;
 using System.IO;
+using System.Text;
 using GDModel;
 using GKCore.Design.Controls;
 using GKCore.Design;
 using GKCore.Design.Views;
 using GKCore.Types;
+using GDModel.Providers.GEDCOM;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -56,6 +59,12 @@ namespace GKCore.Controllers
             try {
                 string noteText = fView.Note.Text.Trim();
                 if (!string.IsNullOrEmpty(noteText)) {
+                    int size = Encoding.UTF8.GetByteCount(noteText);
+                    if (size > GEDCOMConsts.MaxNoteSize) {
+                        AppHost.StdDialogs.ShowAlert(LangMan.LS(LSID.NoteMaxSizeExceeded));
+                        return false;
+                    }
+
                     fNoteRecord.SetNoteText(noteText);
 
                     fBase.NotifyRecord(fNoteRecord, RecordAction.raEdit);
@@ -101,9 +110,9 @@ namespace GKCore.Controllers
             fView.Note.Copy();
         }
 
-        public void Import()
+        public async void Import()
         {
-            string fileName = AppHost.StdDialogs.GetOpenFile("", "", "Text files (*.txt)|*.txt|All files (*.*)|*.*", 0, ".txt");
+            string fileName = await AppHost.StdDialogs.GetOpenFile("", "", "Text files (*.txt)|*.txt|All files (*.*)|*.*", 0, ".txt");
             if (string.IsNullOrEmpty(fileName))
                 return;
 
@@ -112,9 +121,9 @@ namespace GKCore.Controllers
             }
         }
 
-        public void Export()
+        public async void Export()
         {
-            string fileName = AppHost.StdDialogs.GetSaveFile("", "", "Text files (*.txt)|*.txt|All files (*.*)|*.*", 0, ".txt", "", true);
+            string fileName = await AppHost.StdDialogs.GetSaveFile("", "", "Text files (*.txt)|*.txt|All files (*.*)|*.*", 0, ".txt", "", true);
             if (string.IsNullOrEmpty(fileName))
                 return;
 
@@ -139,6 +148,14 @@ namespace GKCore.Controllers
 
             GetControl<IButton>("btnAccept").Text = LangMan.LS(LSID.DlgAccept);
             GetControl<IButton>("btnCancel").Text = LangMan.LS(LSID.DlgCancel);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 

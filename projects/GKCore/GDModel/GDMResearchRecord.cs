@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2021 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -117,8 +117,8 @@ namespace GDModel
         {
             SetName(GEDCOMTagType._RESEARCH);
 
-            fStartDate = new GDMDate((int)GEDCOMTagType._STARTDATE, string.Empty);
-            fStopDate = new GDMDate((int)GEDCOMTagType._STOPDATE, string.Empty);
+            fStartDate = new GDMDate((int)GEDCOMTagType._STARTDATE);
+            fStopDate = new GDMDate((int)GEDCOMTagType._STOPDATE);
 
             fTasks = new GDMList<GDMPointer>();
             fCommunications = new GDMList<GDMPointer>();
@@ -203,7 +203,7 @@ namespace GDModel
             bool result = false;
 
             if (taskRecord != null) {
-                GDMPointer ptr = new GDMPointer((int)GEDCOMTagType._TASK, string.Empty);
+                GDMPointer ptr = new GDMPointer((int)GEDCOMTagType._TASK);
                 ptr.XRef = taskRecord.XRef;
                 fTasks.Add(ptr);
                 result = true;
@@ -216,7 +216,7 @@ namespace GDModel
         {
             if (taskRecord == null) return;
 
-            fTasks.DeleteAt(IndexOfTask(taskRecord));
+            fTasks.RemoveAt(IndexOfTask(taskRecord));
         }
 
         public int IndexOfTask(GDMTaskRecord taskRec)
@@ -241,7 +241,7 @@ namespace GDModel
             bool result = false;
 
             if (groupRecord != null) {
-                GDMPointer ptr = new GDMPointer((int)GEDCOMTagType._GROUP, string.Empty);
+                GDMPointer ptr = new GDMPointer((int)GEDCOMTagType._GROUP);
                 ptr.XRef = groupRecord.XRef;
                 fGroups.Add(ptr);
                 result = true;
@@ -254,7 +254,7 @@ namespace GDModel
         {
             if (groupRecord == null) return;
 
-            fGroups.DeleteAt(IndexOfGroup(groupRecord));
+            fGroups.RemoveAt(IndexOfGroup(groupRecord));
         }
 
         public int IndexOfGroup(GDMGroupRecord groupRec)
@@ -279,7 +279,7 @@ namespace GDModel
             bool result = false;
 
             if (commRecord != null) {
-                GDMPointer ptr = new GDMPointer((int)GEDCOMTagType._COMM, string.Empty);
+                GDMPointer ptr = new GDMPointer((int)GEDCOMTagType._COMM);
                 ptr.XRef = commRecord.XRef;
                 fCommunications.Add(ptr);
                 result = true;
@@ -292,7 +292,7 @@ namespace GDModel
         {
             if (commRecord == null) return;
 
-            fCommunications.DeleteAt(IndexOfCommunication(commRecord));
+            fCommunications.RemoveAt(IndexOfCommunication(commRecord));
         }
 
         public int IndexOfCommunication(GDMCommunicationRecord commRec)
@@ -310,6 +310,21 @@ namespace GDModel
             }
 
             return result;
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fResearchName);
+            hashCode.Add(fPriority);
+            hashCode.Add(fStatus);
+            hashCode.Add(fStartDate);
+            hashCode.Add(fStopDate);
+            hashCode.Add(fPercent);
+            ProcessHashes(ref hashCode, fTasks);
+            ProcessHashes(ref hashCode, fCommunications);
+            ProcessHashes(ref hashCode, fGroups);
         }
     }
 }

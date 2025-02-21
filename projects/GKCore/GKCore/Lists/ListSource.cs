@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -34,13 +34,18 @@ using SGCulture = System.Globalization.CultureInfo;
 
 namespace GKCore.Lists
 {
+    public enum MatchPatternMethod
+    {
+        RegEx, FastIgnoreCase, Fast
+    }
+
+
     /// <summary>
     ///
     /// </summary>
     public abstract class ListSource<T> : IListSource
-        where T : GDMTag
+        where T : class, IGDMObject
     {
-        private bool fColumnsHaveBeenChanged;
         private readonly ExtObservableList<ContentItem> fContentList;
         private SGCulture fSysCulture;
         private int fTotalCount;
@@ -54,21 +59,16 @@ namespace GKCore.Lists
         protected ExternalFilterHandler fExternalFilter;
         protected T fFetchedRec;
         protected ListFilter fFilter;
+        protected MatchPatternMethod fFilterMethod;
 
         protected readonly IBaseContext fBaseContext;
         protected readonly List<MapColumnRec> fColumnsMap;
-        protected readonly ListColumns<T> fListColumns;
+        protected readonly ListColumns fListColumns;
 
 
         public IBaseContext BaseContext
         {
             get { return fBaseContext; }
-        }
-
-        public bool ColumnsHaveBeenChanged
-        {
-            get { return fColumnsHaveBeenChanged; }
-            set { fColumnsHaveBeenChanged = value; }
         }
 
         public List<MapColumnRec> ColumnsMap
@@ -113,7 +113,7 @@ namespace GKCore.Lists
         }
 
 
-        protected ListSource(IBaseContext baseContext, ListColumns<T> defaultListColumns)
+        protected ListSource(IBaseContext baseContext, ListColumns defaultListColumns)
         {
             fBaseContext = baseContext;
             fColumnsMap = new List<MapColumnRec>();
@@ -121,7 +121,40 @@ namespace GKCore.Lists
             fContentList = new ExtObservableList<ContentItem>();
             fQuickFilter = new QuickFilterParams();
 
+            RestoreSettings();
+
             CreateFilter();
+        }
+
+        public void Clear()
+        {
+            fContentList.Clear();
+            fTotalCount = 0;
+
+            fMask = string.Empty;
+            fRegexMask = null;
+            fSimpleMask = string.Empty;
+            fExternalFilter = null;
+            fFilter.Clear();
+
+            fFetchedRec = default;
+
+            fColumnsMap.Clear();
+            fListColumns.Clear();
+        }
+
+        public void RestoreSettings()
+        {
+            var columnOpts = GlobalOptions.Instance.ListOptions[fListColumns.ListType];
+            //rView.SetSortColumn(columnOpts.SortColumn, false);
+            columnOpts.Columns.CopyTo(fListColumns);
+        }
+
+        public void SaveSettings()
+        {
+            var columnOpts = GlobalOptions.Instance.ListOptions[fListColumns.ListType];
+            //columnOpts.SortColumn = rView.SortColumn;
+            fListColumns.CopyTo(columnOpts.Columns);
         }
 
         #region Columns
@@ -133,7 +166,7 @@ namespace GKCore.Lists
             int num = fListColumns.Count;
             for (int i = 0; i < num; i++) {
                 ListColumn cs = fListColumns.OrderedColumns[i];
-                AddColumn(LangMan.LS(cs.ColName), cs.CurWidth, false, cs.Id, 0);
+                AddColumn(cs.ColName, cs.CurWidth, false, cs.Id, 0);
             }
         }
 
@@ -147,32 +180,24 @@ namespace GKCore.Lists
             UpdateColumnsMap();
 
             if (listView != null) {
+                listView.ClearColumns();
+
                 int num = fColumnsMap.Count;
                 for (int i = 0; i < num; i++) {
                     var cm = fColumnsMap[i];
                     listView.AddColumn(cm.Caption, cm.Width, cm.AutoSize);
                 }
-
-                ColumnsHaveBeenChanged = false;
             }
         }
 
         public string GetColumnName(int columnId)
         {
-            if (columnId >= 0 && columnId < fListColumns.Count) {
-                return LangMan.LS(fListColumns[columnId].ColName);
-            }
-
-            return "<?>";
+            return (columnId >= 0 && columnId < fListColumns.Count) ? fListColumns[columnId].ColName : "<?>";
         }
 
         public DataType GetColumnDataType(int columnId)
         {
-            if (columnId >= 0 && columnId < fListColumns.Count) {
-                return fListColumns[columnId].DataType;
-            }
-
-            return DataType.dtString;
+            return (columnId >= 0 && columnId < fListColumns.Count) ? fListColumns[columnId].DataType : DataType.dtString;
         }
 
         public virtual void ChangeColumnWidth(int colIndex, int colWidth)
@@ -185,6 +210,7 @@ namespace GKCore.Lists
 
             if (props != null) {
                 props.CurWidth = colWidth;
+                props.Autosize = false;
             }
         }
 
@@ -234,28 +260,44 @@ namespace GKCore.Lists
 
         #region Mask processing
 
+        /// <summary>
+        /// Tests on working database, filtering 691 from 12174 records, pattern `*xxxx*xxx*`.
+        ///     RegEx -> 394.4 ms -> x1
+        ///     FastIgnoreCase -> 142.9 ms -> x2.8
+        ///     Fast -> 37.9 ms -> x10.4
+        /// </summary>
         protected bool IsMatchesMask(string str, string mask)
         {
-            if (string.IsNullOrEmpty(mask) || mask == "*") {
-                return true;
-            }
+            if (fFilterMethod != MatchPatternMethod.RegEx) {
+                bool ignoreCase = (fFilterMethod == MatchPatternMethod.FastIgnoreCase);
 
-            if (string.IsNullOrEmpty(str)) {
-                return false;
-            }
-
-            if (fMask != mask) {
-                fMask = mask;
-                fSimpleMask = GetSimpleMask(fMask);
-                if (fSimpleMask == null) {
-                    fRegexMask = new Regex(GKUtils.PrepareMask(fMask), GKUtils.RegexOpts);
-                }
-            }
-
-            if (fSimpleMask != null) {
-                return str.IndexOf(fSimpleMask, StringComparison.OrdinalIgnoreCase) >= 0;
+                // This method of processing name matching with a pattern mask compared to using RegEx:
+                //   4.6 times faster if without unsafe operations (601 -> 129 ms)
+                //   and 11.5 times faster if with unsafe operations (601 -> 52 ms).
+                return SysUtils.MatchPattern(mask, str, ignoreCase);
             } else {
-                return fRegexMask.IsMatch(str, 0);
+                bool any = false;
+                if (string.IsNullOrEmpty(mask) || (any = mask.Equals("*"))) {
+                    return true;
+                }
+
+                if (string.IsNullOrEmpty(str)) {
+                    return any;
+                }
+
+                if (fMask != mask) {
+                    fMask = mask;
+                    fSimpleMask = GetSimpleMask(fMask);
+                    if (fSimpleMask == null) {
+                        fRegexMask = new Regex(GKUtils.PrepareMask(fMask), GKUtils.RegexOpts);
+                    }
+                }
+
+                if (fSimpleMask != null) {
+                    return str.IndexOf(fSimpleMask, StringComparison.OrdinalIgnoreCase) >= 0;
+                } else {
+                    return fRegexMask.IsMatch(str, 0);
+                }
             }
         }
 
@@ -322,6 +364,7 @@ namespace GKCore.Lists
 
         public virtual void PrepareFilter()
         {
+            fFilterMethod = GlobalOptions.Instance.MatchPatternMethod;
         }
 
         public virtual bool CheckFilter()
@@ -342,24 +385,16 @@ namespace GKCore.Lists
             fFilter.Conditions.Add(fltCond);
         }
 
-        private bool CheckCondition(FilterCondition fcond)
+        protected bool CheckCondition(FilterCondition fcond, object dataval)
         {
             bool res = true;
 
             try {
-                object dataval;
-                try {
-                    dataval = GetColumnValueEx(fcond.ColumnIndex, -1, false);
-                } catch (Exception ex) {
-                    Logger.WriteError("ListSource.CheckCondition()", ex);
-                    dataval = null;
-                }
-
                 if (dataval == null)
                     return true;
 
                 int compRes = 0;
-                if (fcond.Condition != ConditionKind.ck_Contains) {
+                if (fcond.Condition < ConditionKind.ck_Contains) {
                     compRes = ((IComparable)dataval).CompareTo(fcond.Value);
                 }
 
@@ -389,10 +424,18 @@ namespace GKCore.Lists
                         break;
 
                     case ConditionKind.ck_Contains:
-                        res = GKUtils.MatchesMask(dataval.ToString(), "*" + fcond.Value + "*");
+                        res = dataval.ToString().Contains(fcond.Value.ToString());
                         break;
 
                     case ConditionKind.ck_NotContains:
+                        res = !dataval.ToString().Contains(fcond.Value.ToString());
+                        break;
+
+                    case ConditionKind.ck_ContainsMask:
+                        res = GKUtils.MatchesMask(dataval.ToString(), "*" + fcond.Value + "*");
+                        break;
+
+                    case ConditionKind.ck_NotContainsMask:
                         res = !GKUtils.MatchesMask(dataval.ToString(), "*" + fcond.Value + "*");
                         break;
                 }
@@ -404,6 +447,19 @@ namespace GKCore.Lists
             return res;
         }
 
+        protected virtual bool CheckCommonCondition(FilterCondition fcond)
+        {
+            object dataval;
+            try {
+                dataval = GetColumnValueEx(fcond.ColumnIndex, -1, false);
+            } catch (Exception ex) {
+                Logger.WriteError("ListSource.CheckCommonCondition()", ex);
+                dataval = null;
+            }
+
+            return CheckCondition(fcond, dataval);
+        }
+
         protected bool CheckCommonFilter()
         {
             bool res = true;
@@ -412,7 +468,7 @@ namespace GKCore.Lists
                 var conditions = fFilter.Conditions;
                 for (int i = 0, num = conditions.Count; i < num; i++) {
                     FilterCondition fcond = conditions[i];
-                    res = res && CheckCondition(fcond);
+                    res = res && CheckCommonCondition(fcond);
                     if (!res) break;
                 }
             } catch (Exception ex) {
@@ -430,7 +486,7 @@ namespace GKCore.Lists
 
         public string[] CreateFields()
         {
-            ListColumns<T> listColumns = (ListColumns<T>)ListColumns;
+            var listColumns = ListColumns;
             string[] fields = new string[listColumns.Count + 1]; // +empty item
             fields[0] = "";
 
@@ -446,7 +502,7 @@ namespace GKCore.Lists
         {
             ConditionKind res = ConditionKind.ck_NotEq;
 
-            for (ConditionKind pl = ConditionKind.ck_NotEq; pl <= ConditionKind.ck_NotContains; pl++) {
+            for (ConditionKind pl = ConditionKind.ck_NotEq; pl <= ConditionKind.ck_Last; pl++) {
                 if (GKData.CondSigns[(int)pl] == condName) {
                     res = pl;
                     break;
@@ -473,10 +529,12 @@ namespace GKCore.Lists
 
         #region Cell values
 
+        private static readonly object UnknownUDNObject = (object)UDN.Unknown;
+
         protected static object GetDateValue(GDMCustomEvent evt, bool isVisible)
         {
             if (evt == null) {
-                return (isVisible) ? null : (object)UDN.CreateUnknown();
+                return (isVisible) ? null : UnknownUDNObject;
             }
 
             return GetDateValue(evt.Date.Value, isVisible);
@@ -487,7 +545,7 @@ namespace GKCore.Lists
             object result;
 
             if (date == null) {
-                result = (isVisible) ? null : (object)UDN.CreateUnknown();
+                result = (isVisible) ? null : UnknownUDNObject;
             } else {
                 if (isVisible) {
                     GlobalOptions glob = GlobalOptions.Instance;
@@ -516,8 +574,8 @@ namespace GKCore.Lists
                     return ((double)val).ToString(cs.Format, cs.NumFmt);
 
                 case DataType.dtDateTime:
-                    DateTime dtx = ((DateTime)val);
-                    return ((dtx.Ticks == 0) ? "" : dtx.ToString("yyyy.MM.dd HH:mm:ss", null));
+                    DateTime dtx = (DateTime)val;
+                    return (dtx.Ticks == 0) ? "" : dtx.ToString("yyyy.MM.dd HH:mm:ss", null);
 
                 case DataType.dtGEDCOMDate:
                     return val.ToString();
@@ -627,12 +685,7 @@ namespace GKCore.Lists
 
         public object GetContentItem(int itemIndex)
         {
-            object result;
-            if (itemIndex < 0 || itemIndex >= fContentList.Count) {
-                result = null;
-            } else {
-                result = fContentList[itemIndex].Record;
-            }
+            object result = (itemIndex < 0 || itemIndex >= fContentList.Count) ? null : fContentList[itemIndex].Record;
             return result;
         }
 
@@ -695,6 +748,10 @@ namespace GKCore.Lists
             return false;
         }
 
+        public virtual void OnItemSelected(int itemIndex, object rowData)
+        {
+        }
+
         #endregion
 
         #region Sort support
@@ -725,7 +782,7 @@ namespace GKCore.Lists
         public void SortContents(int sortColumn, bool sortAscending)
         {
             try {
-                fSysCulture = CulturesPool.GetSystemCulture(fBaseContext.Culture);
+                fSysCulture = (fBaseContext != null) ? CulturesPool.GetSystemCulture(fBaseContext.Culture) : SGCulture.CurrentCulture;
 
                 fContentList.BeginUpdate();
 

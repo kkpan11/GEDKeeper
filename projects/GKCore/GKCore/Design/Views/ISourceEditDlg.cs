@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -32,11 +32,14 @@ namespace GKCore.Design.Views
         ISheetList NotesList { get; }
         ISheetList MediaList { get; }
         ISheetList RepositoriesList { get; }
+        ISheetList UserRefList { get; }
 
         ITextBox ShortTitle { get; }
         ITextBox Author { get; }
         ITextBox DescTitle { get; }
         ITextBox Publication { get; }
         ITextBox Text { get; }
+
+        IDateControl Date { get; }
     }
 }

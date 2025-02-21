@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -60,6 +60,8 @@ namespace GKUI.Forms
         private CheckMenuItem miTraceKinships;
         private CheckMenuItem miCertaintyIndex;
         private CheckMenuItem miXRefVisible;
+        private CheckMenuItem miTrackSelectedLines;
+        private CheckMenuItem miTrackMatchedSources;
         private ButtonMenuItem miRebuildTree;
         private ButtonMenuItem miFillColor;
         private ButtonMenuItem miFillImage;
@@ -85,6 +87,11 @@ namespace GKUI.Forms
         private GKDropDownToolItem tbBorders;
         private ContextMenu MenuBorders;
         private CheckMenuItem miHideDescSpouses;
+        private CheckMenuItem miParentAges;
+        private ButtonMenuItem miMaps;
+        private ButtonMenuItem miMapAncestors;
+        private ButtonMenuItem miMapDescendants;
+        private ButtonMenuItem miMapAll;
 
 #pragma warning restore CS0169, CS0649, IDE0044, IDE0051
         #endregion
@@ -98,6 +105,7 @@ namespace GKUI.Forms
         private RadioMenuItem miGensInfCommon;
         private RadioMenuItem miGensInfAncestors;
         private RadioMenuItem miGensInfDescendants;
+
 
         public IWindow OwnerWindow
         {
@@ -144,6 +152,12 @@ namespace GKUI.Forms
             miXRefVisible.Checked = fTreeBox.Options.XRefVisible;
             fTreeBox.XRefVisible = fTreeBox.Options.XRefVisible;
 
+            miTrackSelectedLines.Checked = fTreeBox.Options.TrackSelectedLines;
+
+            miTrackMatchedSources.Checked = fTreeBox.Options.TrackMatchedSources;
+
+            miParentAges.Checked = fTreeBox.Options.ParentAges;
+
             miTraceSelected.Checked = fTreeBox.Options.TraceSelected;
             fTreeBox.TraceSelected = fTreeBox.Options.TraceSelected;
 
@@ -157,8 +171,7 @@ namespace GKUI.Forms
 
             SetupDepth();
 
-            if (GlobalOptions.Instance.MaximizeChartWindows)
-                this.WindowState = Eto.Forms.WindowState.Maximized;
+            AppHost.Instance.SetWindowBounds(this, GlobalOptions.Instance.ChartWindowsShowMode);
         }
 
         protected override void Dispose(bool disposing)
@@ -196,6 +209,15 @@ namespace GKUI.Forms
             miXRefVisible = new CheckMenuItem();
             miXRefVisible.Click += miXRefVisible_Click;
 
+            miTrackSelectedLines = new CheckMenuItem();
+            miTrackSelectedLines.Click += miTrackSelectedLines_Click;
+
+            miTrackMatchedSources = new CheckMenuItem();
+            miTrackMatchedSources.Click += miTrackMatchedSources_Click;
+
+            miParentAges = new CheckMenuItem();
+            miParentAges.Click += miParentAges_Click;
+
             miFillColor = new ButtonMenuItem();
             miFillColor.Click += miFillColor_Click;
 
@@ -213,6 +235,9 @@ namespace GKUI.Forms
                                          miTraceKinships,
                                          miCertaintyIndex,
                                          miXRefVisible,
+                                         miTrackSelectedLines,
+                                         miTrackMatchedSources,
+                                         miParentAges,
                                          new SeparatorMenuItem(),
                                          miFillColor,
                                          miFillImage,
@@ -263,6 +288,18 @@ namespace GKUI.Forms
             miMergeDuplicates = new ButtonMenuItem();
             miMergeDuplicates.Click += miMergeDuplicates_Click;
 
+            miMapAncestors = new ButtonMenuItem();
+            miMapAncestors.Click += miMapAncestors_Click;
+
+            miMapDescendants = new ButtonMenuItem();
+            miMapDescendants.Click += miMapDescendants_Click;
+
+            miMapAll = new ButtonMenuItem();
+            miMapAll.Click += miMapAll_Click;
+
+            miMaps = new ButtonMenuItem();
+            miMaps.Items.AddRange(new MenuItem[] { miMapAncestors, miMapDescendants, miMapAll });
+
             MenuPerson = new ContextMenu();
             MenuPerson.Items.AddRange(new MenuItem[] {
                                           miEdit,
@@ -284,6 +321,8 @@ namespace GKUI.Forms
                                           miRebuildTree,
                                           miRebuildKinships,
                                           new SeparatorMenuItem(),
+                                          miMaps,
+                                          new SeparatorMenuItem(),
                                           miSelectColor});
             MenuPerson.Opening += MenuPerson_Opening;
         }
@@ -291,6 +330,7 @@ namespace GKUI.Forms
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
+
             fTreeBox.Focus();
             UpdateControls();
         }
@@ -429,7 +469,8 @@ namespace GKUI.Forms
 
             RadioMenuItem controller = null;
             for (var bs = GfxBorderStyle.None; bs <= GfxBorderStyle.Last; bs++) {
-                var item = UIHelper.AddToolStripItem(MenuBorders, controller, bs.ToString(), (int)bs, miBorderX_Click);
+                int bsIdx = (int)bs;
+                var item = UIHelper.AddToolStripItem(MenuBorders, controller, LangMan.LS(BorderPainter.StyleNames[bsIdx]), bsIdx, miBorderX_Click);
                 if (controller == null)
                     controller = item;
             }
@@ -525,6 +566,21 @@ namespace GKUI.Forms
             fTreeBox.RebuildKinships();
         }
 
+        private void miMapAncestors_Click(object sender, EventArgs e)
+        {
+            fController.ShowMapAncestors();
+        }
+
+        private void miMapDescendants_Click(object sender, EventArgs e)
+        {
+            fController.ShowMapDescendants();
+        }
+
+        private void miMapAll_Click(object sender, EventArgs e)
+        {
+            fController.ShowMapAll();
+        }
+
         private void miTraceSelected_Click(object sender, EventArgs e)
         {
             fTreeBox.Options.TraceSelected = miTraceSelected.Checked;
@@ -554,6 +610,28 @@ namespace GKUI.Forms
             fTreeBox.XRefVisible = miXRefVisible.Checked;
         }
 
+        private void miTrackSelectedLines_Click(object sender, EventArgs e)
+        {
+            fTreeBox.Options.TrackSelectedLines = miTrackSelectedLines.Checked;
+            fTreeBox.Invalidate();
+        }
+
+        private void miTrackMatchedSources_Click(object sender, EventArgs e)
+        {
+            fTreeBox.Options.TrackMatchedSources = miTrackMatchedSources.Checked;
+            fTreeBox.Invalidate();
+        }
+
+        private void miParentAges_Click(object sender, EventArgs e)
+        {
+            fTreeBox.Options.ParentAges = miParentAges.Checked;
+            if (fTreeBox.Options.ParentAges) {
+                GenChart();
+            } else {
+                fTreeBox.Invalidate();
+            }
+        }
+
         private void miFillColor_Click(object sender, EventArgs e)
         {
             using (var colorDialog1 = new ColorDialog()) {
@@ -565,9 +643,9 @@ namespace GKUI.Forms
             }
         }
 
-        private void miFillImage_Click(object sender, EventArgs e)
+        private async void miFillImage_Click(object sender, EventArgs e)
         {
-            string fileName = AppHost.StdDialogs.GetOpenFile("", GKUtils.GetBackgroundsPath(), LangMan.LS(LSID.ImagesFilter), 1, "");
+            string fileName = await AppHost.StdDialogs.GetOpenFile("", GKUtils.GetBackgroundsPath(), LangMan.LS(LSID.ImagesFilter), 1, "");
             if (string.IsNullOrEmpty(fileName)) return;
 
             Image img = new Bitmap(fileName);

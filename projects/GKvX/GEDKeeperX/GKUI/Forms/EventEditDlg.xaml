@@ -23,10 +23,18 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
                             <Label x:Name="lblEvent" Grid.Column="0" Grid.Row="0" />
                             <StackLayout Orientation="Horizontal" Spacing="4" Grid.Column="1" Grid.Row="0">
-                                <comcom:GKComboBox x:Name="cmbEventType" IsReadOnly="True" SelectedIndexChanged="EditEventType_SelectedIndexChanged" WidthRequest="260" />
-                                <Entry x:Name="txtEventName" HorizontalOptions="FillAndExpand" />
+                                <comcom:GKComboBox x:Name="cmbEventType" SelectedIndexChanged="EditEventType_SelectedIndexChanged" WidthRequest="260" />
                             </StackLayout>
 
                             <Label x:Name="lblAttrValue" Grid.Column="0" Grid.Row="1" />
@@ -43,10 +51,10 @@
                             <comcom:GKDateControl x:Name="dateCtl" Grid.Column="1" Grid.Row="3" />
 
                             <Label x:Name="lblCause" Grid.Column="0" Grid.Row="4" />
-                            <Entry x:Name="txtEventCause" Grid.Column="1" Grid.Row="4" />
+                            <comcom:GKComboBox x:Name="txtEventCause" Grid.Column="1" Grid.Row="4" />
 
                             <Label x:Name="lblOrg" Grid.Column="0" Grid.Row="5" />
-                            <Entry x:Name="txtEventOrg" Grid.Column="1" Grid.Row="5" />
+                            <comcom:GKComboBox x:Name="txtEventOrg" Grid.Column="1" Grid.Row="5" />
                         </Grid>
 
                         <Label VerticalOptions="FillAndExpand" />

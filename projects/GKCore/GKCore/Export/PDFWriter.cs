@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -22,11 +22,13 @@
 #define UNOFF_ITS
 #endif
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using BSLib;
 using GKCore.Charts;
 using GKCore.Design.Graphics;
+using GKCore.Types;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
 using it = iTextSharp.text;
@@ -104,6 +106,7 @@ namespace GKCore.Export
         private Document fDocument;
         private bool fMulticolumns;
         private PdfWriter fPdfWriter;
+        private GKPageSize fPredefPage;
         private itTable fTable;
         private Stack<ITextElementArray> fStack;
 
@@ -116,6 +119,12 @@ namespace GKCore.Export
             Stream fontStream = GetType().Assembly.GetManifestResourceStream("Resources.fonts.FreeSans.ttf");
             var fontBytes = FileHelper.ReadByteArray(fontStream);
             fBaseFont = BaseFont.CreateFont("FreeSans.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, BaseFont.CACHED, fontBytes, null);
+        }
+
+        public PDFWriter(GKPageSize predefPage, bool albumPage) : this()
+        {
+            fPredefPage = predefPage;
+            fAlbumPage = albumPage;
         }
 
         protected override void Dispose(bool disposing)
@@ -152,11 +161,46 @@ namespace GKCore.Export
             return ExtRectF.Create(fDocument.Left, fDocument.Bottom, fDocument.Right, fDocument.Top);
         }
 
+        public void SetPageSize(ExtSize size)
+        {
+            itRectangle pageRect = new itRectangle(0, 0, size.Height, size.Width);
+            pageRect = pageRect.Rotate();
+            fDocument.SetPageSize(pageRect);
+            fPdfWriter.SetPageSize(pageRect);
+        }
+
         public override void BeginWrite()
         {
-            itRectangle pageSize = !fAlbumPage ? PageSize.A4 : PageSize.A4.Rotate();
+            itRectangle pageSize;
+            if (fPredefPage == GKPageSize.None) {
+                pageSize = PageSize.A4;
+            } else {
+                switch (fPredefPage) {
+                    case GKPageSize.A0:
+                        pageSize = PageSize.A0;
+                        break;
+                    case GKPageSize.A1:
+                        pageSize = PageSize.A1;
+                        break;
+                    case GKPageSize.A2:
+                        pageSize = PageSize.A2;
+                        break;
+                    case GKPageSize.A3:
+                        pageSize = PageSize.A3;
+                        break;
+                    case GKPageSize.A4:
+                    default:
+                        pageSize = PageSize.A4;
+                        break;
+                    case GKPageSize.A5:
+                        pageSize = PageSize.A5;
+                        break;
+                }
+            }
 
-            fDocument = new Document(pageSize, fMargins.Left, fMargins.Right, fMargins.Top, fMargins.Bottom);
+            itRectangle pageRect = !fAlbumPage ? pageSize : pageSize.Rotate();
+
+            fDocument = new Document(pageRect, fMargins.Left, fMargins.Right, fMargins.Top, fMargins.Bottom);
             fPdfWriter = PdfWriter.GetInstance(fDocument, new FileStream(fFileName, FileMode.Create, FileAccess.Write));
 
             fDocument.AddTitle(fDocumentTitle);
@@ -339,25 +383,30 @@ namespace GKCore.Export
             fDocument.Add(new Chunk(line1));
         }
 
-        public override void AddImage(IImage image)
+        public override void AddImage(IImage image, TextAlignment alignment)
         {
-            if (image != null) {
-                itImage img = PDFRenderer.ConvertImage(image);
+            try {
+                if (image == null) return;
 
-                float fitWidth = fColumnWidth * 0.5f;
-                img.ScaleToFit(fitWidth, fitWidth);
+                itImage img = PDFRenderer.ConvertImage(image, string.Empty);
+                if (img == null) return;
+
+                ///float fitWidth = fColumnWidth * 0.5f;
+                ///img.ScaleToFit(fitWidth, fitWidth);
 
                 // FIXME: the moving, if the page height is insufficient for the image height
 
-                //img.Alignment = Image.TEXTWRAP;
-                img.IndentationLeft = 5f;
-                img.SpacingBefore = 5f;
-                img.SpacingAfter = 5f;
+                img.Alignment = itImage.TEXTWRAP | iAlignments[(int)alignment];
+                img.IndentationLeft = 4f;
+                img.SpacingBefore = 4f;
+                img.SpacingAfter = 4f;
 
                 //Paragraph imgpar = new Paragraph(new Chunk(img, 0, 0, true));
                 //imgpar.KeepTogether = true;
 
                 AddElement(img);
+            } catch (Exception ex) {
+                Logger.WriteError("PDFWriter.AddImage()", ex);
             }
         }
 

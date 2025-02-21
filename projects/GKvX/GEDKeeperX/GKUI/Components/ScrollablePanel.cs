@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -20,27 +20,64 @@
 
 using System;
 using BSLib;
+using GKCore.Interfaces;
 using SkiaSharp.Views.Forms;
 using Xamarin.Forms;
 
 namespace GKUI.Components
 {
+    public class MouseEventArgs : EventArgs
+    {
+        public SKMouseButton Buttons { get; private set; }
+
+        public Point Location { get; private set; }
+
+        public bool Handled { get; set; }
+
+        public float Pressure { get; private set; }
+
+        public int Delta { get; private set; }
+
+        public MouseEventArgs(SKMouseButton buttons, Point location, int delta = 0, float pressure = 1f)
+        {
+            Buttons = buttons;
+            Location = location;
+            Delta = delta;
+            Pressure = pressure;
+        }
+    }
+
+
+    public class ZoomEventArgs : EventArgs
+    {
+        public float Scale { get; } = 1.0f;
+
+        public Point ScaleOrigin { get; }
+
+        public ZoomEventArgs(float scale, Point origin)
+        {
+            Scale = scale;
+            ScaleOrigin = origin;
+        }
+    }
+
+
     /// <summary>
     ///
     /// </summary>
-    public class ScrollablePanel : ScrollView
+    public class ScrollablePanel : ScrollView, IScrollableContainer
     {
         public const int SmallChange = 1;
         public const int LargeChange = 10;
 
-        private SKCanvasView fCanvas;
+        private readonly SKCanvasView fCanvas;
         private bool fCenteredImage;
         private Font fFont;
         private bool fHasHScroll;
         private bool fHasVScroll;
         private ExtSize fImageSize;
         private Rectangle fImageRect;
-        private Rectangle fImageViewport;
+        private ExtRect fImageViewport;
         private int fMouseOffsetX, fMouseOffsetY;
         private Color fTextColor;
         private ExtRect fViewport;
@@ -86,9 +123,9 @@ namespace GKUI.Components
             get { return fImageRect; }
         }
 
-        protected ExtRect ImageViewport
+        public ExtRect ImageViewport
         {
-            get { return UIHelper.Rt2Rt(fImageViewport); }
+            get { return fImageViewport; }
         }
 
         public Point MouseOffset
@@ -122,6 +159,11 @@ namespace GKUI.Components
             get { return fViewport; }
         }
 
+        public bool VirtualCanvas
+        {
+            get { return false; }
+        }
+
 
         public ScrollablePanel()
         {
@@ -131,13 +173,19 @@ namespace GKUI.Components
             fCanvas.IgnorePixelScaling = true;
             fCanvas.PaintSurface += PaintHandler;
             fCanvas.EnableTouchEvents = true;
+            fCanvas.Touch += OnTouch;
             fCanvas.VerticalOptions = LayoutOptions.CenterAndExpand;
             fCanvas.HorizontalOptions = LayoutOptions.CenterAndExpand;
+            //fCanvas.SizeChanged += OnSizeChanged;
             Content = fCanvas;
 
             base.Orientation = ScrollOrientation.Both;
             base.SizeChanged += OnSizeChanged;
             base.Scrolled += OnScroll;
+
+            var tap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
+            tap.Tapped += OnTapped;
+            fCanvas.GestureRecognizers.Add(tap);
 
             //fFont = SystemFonts.Label();
             //fTextColor = SystemColors.ControlText;
@@ -198,7 +246,7 @@ namespace GKUI.Components
 
             int width = Math.Min(fImageSize.Width, fViewport.Width);
             int height = Math.Min(fImageSize.Height, fViewport.Height);
-            fImageViewport = new Rectangle(destX, destY, width, height);
+            fImageViewport = ExtRect.CreateBounds(destX, destY, width, height);
         }
 
         /*protected override void OnMouseDown(MouseEventArgs e)
@@ -209,22 +257,6 @@ namespace GKUI.Components
 
             e.Handled = true;
             base.OnMouseDown(e);
-        }
-
-        protected override void OnMouseWheel(MouseEventArgs e)
-        {
-            //Console.WriteLine("ScrollablePanel.OnMouseWheel()");
-
-            int delta = -(int)(e.Delta.Height * 120.0f);
-
-            if (Keys.None == e.Modifiers) {
-                AdjustScroll(0, delta);
-            } else if (Keys.Shift == e.Modifiers) {
-                AdjustScroll(delta, 0);
-            }
-
-            e.Handled = true;
-            base.OnMouseWheel(e);
         }
 
         protected override void OnShown(EventArgs e)
@@ -300,13 +332,7 @@ namespace GKUI.Components
 
         protected Point GetImageRelativeLocation(Point mpt, bool buttons)
         {
-            /*
-             * In Eto/Gtk, mouse events coming to Scrollable handlers have coordinates 
-             * with the origin of the Scrollable control if no key is pressed and 
-             * with the origin of the nested Canvas if any key is pressed.
-             */
-
-            Point pt = Point.Zero;
+            Point pt = mpt;
             /*if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && buttons) {
                 int aX = (int)mpt.X - fImageViewport.X;
                 int aY = (int)mpt.Y - fImageViewport.Y;
@@ -315,22 +341,12 @@ namespace GKUI.Components
             } else {
                 pt = new Point((int)mpt.X + fMouseOffsetX, (int)mpt.Y + fMouseOffsetY);
             }*/
-
-            // for debug purposes
-            //Console.WriteLine("IR: " + new Point(mpt).ToString() + " -- " + pt.ToString() + " -- " + MouseOffset.ToString() + " -- " + buttons + " -- " + fImageViewport.ToString());
-
             return pt;
         }
 
         protected Point GetControlRelativeLocation(Point mpt, bool buttons)
         {
-            /*
-             * In Eto/Gtk, mouse events coming to Scrollable handlers have coordinates 
-             * with the origin of the Scrollable control if no key is pressed and 
-             * with the origin of the nested Canvas if any key is pressed.
-             */
-
-            Point pt = Point.Zero;
+            Point pt = mpt;
             /*if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && buttons) {
                 int aX = (int)mpt.X - ((!fHasHScroll) ? 0 : fMouseOffsetX);
                 int aY = (int)mpt.Y - ((!fHasVScroll) ? 0 : fMouseOffsetY);
@@ -339,16 +355,89 @@ namespace GKUI.Components
             } else {
                 pt = new PointF(mpt.X, mpt.Y);
             }*/
-
-            // for debug purposes
-            //Console.WriteLine("CTL: " + new Point(mpt).ToString() + " -- " + pt.ToString() + " -- " + MouseOffset.ToString() + " -- " + buttons + " -- " + fImageViewport.ToString());
-
             return pt;
         }
 
         protected void InvalidateContent()
         {
             fCanvas.InvalidateSurface();
+        }
+
+        private void OnTapped(object sender, EventArgs e)
+        {
+            OnMouseDoubleClick(e);
+        }
+
+        protected virtual void OnMouseDoubleClick(EventArgs e)
+        {
+        }
+
+        protected virtual void OnMouseDown(MouseEventArgs e)
+        {
+        }
+
+        protected virtual void OnMouseUp(MouseEventArgs e)
+        {
+        }
+
+        protected virtual void OnMouseMove(MouseEventArgs e)
+        {
+        }
+
+        protected virtual void OnMouseWheel(MouseEventArgs e)
+        {
+        }
+
+        /*private static int fClickCount;
+
+        private bool ClickHandle()
+        {
+            if (fClickCount > 1) {
+                // double tap
+                OnMouseDoubleClick(EventArgs.Empty);
+            } else {
+                // single tap
+            }
+            fClickCount = 0;
+            return false;
+        }*/
+
+        private void OnTouch(object sender, SKTouchEventArgs e)
+        {
+            var xPt = new Point(e.Location.X, e.Location.Y);
+            var mouseArgs = new MouseEventArgs(e.MouseButton, xPt, e.WheelDelta, e.Pressure);
+
+            switch (e.ActionType) {
+                case SKTouchAction.Pressed: {
+                        if (!IsFocused) base.Focus();
+                        OnMouseDown(mouseArgs);
+
+                        /*if (fClickCount < 1) {
+                            TimeSpan tt = new TimeSpan(0, 0, 0, 0, 250);
+                            Device.StartTimer(tt, ClickHandle);
+                        }
+                        fClickCount++;*/
+                    }
+                    break;
+
+                case SKTouchAction.Released:
+                    OnMouseUp(mouseArgs);
+                    break;
+
+                case SKTouchAction.Moved:
+                    OnMouseMove(mouseArgs);
+                    break;
+
+                case SKTouchAction.WheelChanged:
+                    OnMouseWheel(mouseArgs);
+                    break;
+            }
+
+            e.Handled = mouseArgs.Handled;
+        }
+
+        internal virtual void OnZoom(ZoomEventArgs e)
+        {
         }
     }
 }

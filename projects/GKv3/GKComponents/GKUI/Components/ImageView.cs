@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -23,23 +23,23 @@ using System.Collections.Generic;
 using BSLib;
 using Eto.Drawing;
 using Eto.Forms;
+using GDModel;
 using GKCore;
+using GKCore.Controllers;
 using GKCore.Design.Controls;
 using GKCore.Design.Graphics;
+using GKCore.Design.Views;
 using GKCore.Interfaces;
 using GKCore.Types;
 using GKUI.Platform.Handlers;
+using GKUI.Themes;
 
 namespace GKUI.Components
 {
-    public class ImageView : Panel, ILocalizable, IImageView
+    public class ImageView : Panel, IImageView
     {
-        private ImageBox imageBox;
-        private Panel toolStrip;
-        private ComboBox cbZoomLevels;
-        private Button btnSizeToFit;
-        private Button btnZoomIn;
-        private Button btnZoomOut;
+        private GDMMultimediaRecord fMediaRecord;
+        private MediaViewerController fController;
 
 
         public List<NamedRegion> NamedRegions
@@ -96,7 +96,23 @@ namespace GKUI.Components
             btnZoomOut.ToolTip = LangMan.LS(LSID.ZoomOut);
         }
 
+        public void ApplyTheme()
+        {
+            UIHelper.SetButtonThemeImage(btnSizeToFit, ThemeElement.Glyph_SizeToFit);
+            UIHelper.SetButtonThemeImage(btnZoomIn, ThemeElement.Glyph_ZoomIn);
+            UIHelper.SetButtonThemeImage(btnZoomOut, ThemeElement.Glyph_ZoomOut);
+            UIHelper.SetButtonThemeImage(btnPortrait, ThemeElement.Glyph_SetPortrait);
+        }
+
         #region Component design
+
+        private ImageBox imageBox;
+        private Panel toolStrip;
+        private ComboBox cbZoomLevels;
+        private Button btnSizeToFit;
+        private Button btnZoomIn;
+        private Button btnZoomOut;
+        private Button btnPortrait;
 
         private void InitializeComponent()
         {
@@ -104,18 +120,20 @@ namespace GKUI.Components
 
             btnSizeToFit = new Button();
             btnSizeToFit.Size = new Size(28, 28);
-            btnSizeToFit.Image = UIHelper.LoadResourceImage("Resources.btn_size_to_fit.png");
             btnSizeToFit.Click += btnSizeToFit_Click;
 
             btnZoomIn = new Button();
             btnZoomIn.Size = new Size(28, 28);
-            btnZoomIn.Image = UIHelper.LoadResourceImage("Resources.btn_zoom_in.png");
             btnZoomIn.Click += btnZoomIn_Click;
 
             btnZoomOut = new Button();
             btnZoomOut.Size = new Size(28, 28);
-            btnZoomOut.Image = UIHelper.LoadResourceImage("Resources.btn_zoom_out.png");
             btnZoomOut.Click += btnZoomOut_Click;
+
+            btnPortrait = new Button();
+            btnPortrait.Size = new Size(28, 28);
+            btnPortrait.Click += btnPortrait_Click;
+            btnPortrait.Visible = false;
 
             cbZoomLevels = new ComboBox();
             cbZoomLevels.ReadOnly = true;
@@ -126,21 +144,13 @@ namespace GKUI.Components
             toolStrip.Content = new StackLayout() {
                 Orientation = Orientation.Horizontal,
                 Spacing = 10,
-                Items = {
-                    btnSizeToFit,
-                    btnZoomIn,
-                    btnZoomOut,
-                    cbZoomLevels
-                }
+                Items = { btnSizeToFit, btnZoomIn, btnZoomOut, cbZoomLevels, btnPortrait }
             };
 
             imageBox = new ImageBox();
-            imageBox.AllowZoom = true;
-            imageBox.BackgroundColor = Colors.Gray;
-            imageBox.ImageBorderColor = Colors.AliceBlue;
-            imageBox.ImageBorderStyle = ImageBoxBorderStyle.FixedSingleGlowShadow;
-            imageBox.SelectionMode = ImageBoxSelectionMode.Zoom;
+            imageBox.SelectionMode = ImageBoxSelectionMode.Rectangle;
             imageBox.ZoomChanged += imageBox_ZoomChanged;
+            imageBox.SelectionRegionChanged += imageBox_SelectionRegionChanged;
 
             Content = new TableLayout() {
                 Rows = {
@@ -164,14 +174,19 @@ namespace GKUI.Components
             imageBox.NamedRegions.Add(new NamedRegion(name, region));
         }
 
-        public void OpenImage(IImage image)
+        public void OpenImage(MediaViewerController controller, IImage image)
         {
+            fController = controller;
+            if (fController != null) {
+                fMediaRecord = fController.MultimediaRecord;
+            }
+
             if (image != null) {
                 OpenImage(((ImageHandler)image).Handle);
             }
         }
 
-        public void OpenImage(Image image)
+        private void OpenImage(Image image)
         {
             if (image != null) {
                 imageBox.BeginUpdate();
@@ -220,6 +235,27 @@ namespace GKUI.Components
         private void btnZoomOut_Click(object sender, EventArgs e)
         {
             imageBox.ZoomOut();
+        }
+
+        private async void btnPortrait_Click(object sender, EventArgs e)
+        {
+            var mediaWin = ParentWindow as IMediaViewerWin;
+            if (mediaWin == null) return;
+
+            var baseWin = mediaWin.OwnerWindow as IBaseWindow;
+            if (baseWin == null) return;
+
+            if (await BaseController.SelectPhotoRegion(mediaWin, baseWin, fMediaRecord, UIHelper.Rt2Rt(imageBox.SelectionRegion))) {
+                imageBox.SelectionRegion = RectangleF.Empty;
+
+                if (fController != null)
+                    fController.ProcessPortraits(this);
+            }
+        }
+
+        private void imageBox_SelectionRegionChanged(object sender, EventArgs e)
+        {
+            btnPortrait.Visible = (ParentWindow is IMediaViewerWin && !imageBox.SelectionRegion.IsEmpty);
         }
 
         private void imageBox_ZoomChanged(object sender, EventArgs e)

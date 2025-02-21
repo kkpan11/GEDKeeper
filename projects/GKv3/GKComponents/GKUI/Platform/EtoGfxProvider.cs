@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2017-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -39,66 +39,101 @@ namespace GKUI.Platform
         {
         }
 
+        public void FreeImage(ref IImage image)
+        {
+            try {
+                if (image == null) return;
+
+                var imgHandler = image as ImageHandler;
+                if (imgHandler == null) return;
+
+                var imgDisposable = imgHandler.Handle as IDisposable;
+                if (imgDisposable == null) return;
+
+                imgDisposable.Dispose();
+
+                image = null;
+            } catch (Exception ex) {
+                Logger.WriteError("EtoGfxProvider.FreeImage()", ex);
+            }
+        }
+
         public Stream CheckOrientation(Stream inputStream)
         {
-            Stream transformStream = ImageProcess.IsNeedOrient(inputStream) ? ImageProcess.AutoOrient(inputStream) : inputStream;
+            Stream transformStream = ImageProcess.PrepareImage(inputStream);
             transformStream.Seek(0, SeekOrigin.Begin);
             return transformStream;
         }
 
-        public IImage LoadImage(Stream stream, int thumbWidth, int thumbHeight, ExtRect cutoutArea)
+        public IImage LoadImage(Stream stream, int thumbWidth, int thumbHeight, ExtRect cutoutArea, string cachedFile)
         {
             if (stream == null)
                 throw new ArgumentNullException("stream");
 
-            Bitmap bmp = new Bitmap(stream);
-            Bitmap result = null;
-
             try {
-                int imgWidth, imgHeight;
-
-                bool cutoutIsEmpty = cutoutArea.IsEmpty();
-                if (cutoutIsEmpty) {
-                    imgWidth = bmp.Width;
-                    imgHeight = bmp.Height;
-                } else {
-                    imgWidth = cutoutArea.Width;
-                    imgHeight = cutoutArea.Height;
-                }
-
-                bool thumbIsEmpty = (thumbWidth <= 0 && thumbHeight <= 0);
-                if (!thumbIsEmpty) {
-                    float ratio = GfxHelper.ZoomToFit(imgWidth, imgHeight, thumbWidth, thumbHeight);
-                    imgWidth = (int)(imgWidth * ratio);
-                    imgHeight = (int)(imgHeight * ratio);
-                }
-
-                if (cutoutIsEmpty && thumbIsEmpty) {
-                    result = bmp;
-                } else {
-                    Bitmap newImage = new Bitmap(imgWidth, imgHeight, PixelFormat.Format24bppRgb);
-                    using (Graphics graphic = new Graphics(newImage)) {
-                        graphic.AntiAlias = true;
-                        graphic.ImageInterpolation = ImageInterpolation.High;
-                        graphic.PixelOffsetMode = PixelOffsetMode.Half;
-
-                        if (cutoutIsEmpty) {
-                            graphic.DrawImage(bmp, 0, 0, imgWidth, imgHeight);
-                        } else {
-                            var sourRect = new RectangleF(cutoutArea.Left, cutoutArea.Top, cutoutArea.Width, cutoutArea.Height);
-                            var destRect = new RectangleF(0, 0, imgWidth, imgHeight);
-
-                            graphic.DrawImage(bmp, sourRect, destRect);
-                        }
+                Bitmap bmp;
+                try {
+                    bmp = new Bitmap(stream);
+                } catch {
+                    try {
+                        stream = ImageProcess.LoadProblemImage(stream, cachedFile);
+                        bmp = new Bitmap(stream);
+                    } catch (Exception ex2) {
+                        Logger.WriteError("EtoGfxProvider.LoadImage()", ex2);
+                        return null;
                     }
-                    result = newImage;
                 }
-            } finally {
-                if (result != bmp)
-                    bmp.Dispose();
-            }
 
-            return new ImageHandler(result);
+                Bitmap result = null;
+
+                try {
+                    int imgWidth, imgHeight;
+
+                    bool cutoutIsEmpty = cutoutArea.IsEmpty();
+                    if (cutoutIsEmpty) {
+                        imgWidth = bmp.Width;
+                        imgHeight = bmp.Height;
+                    } else {
+                        imgWidth = cutoutArea.Width;
+                        imgHeight = cutoutArea.Height;
+                    }
+
+                    bool thumbIsEmpty = (thumbWidth <= 0 && thumbHeight <= 0);
+                    if (!thumbIsEmpty) {
+                        float ratio = GfxHelper.ZoomToFit(imgWidth, imgHeight, thumbWidth, thumbHeight);
+                        imgWidth = (int)(imgWidth * ratio);
+                        imgHeight = (int)(imgHeight * ratio);
+                    }
+
+                    if (cutoutIsEmpty && thumbIsEmpty) {
+                        result = bmp;
+                    } else {
+                        Bitmap newImage = new Bitmap(imgWidth, imgHeight, PixelFormat.Format24bppRgb);
+                        using (Graphics graphic = new Graphics(newImage)) {
+                            graphic.AntiAlias = true;
+                            graphic.ImageInterpolation = ImageInterpolation.High;
+                            graphic.PixelOffsetMode = PixelOffsetMode.Half;
+
+                            if (cutoutIsEmpty) {
+                                graphic.DrawImage(bmp, 0, 0, imgWidth, imgHeight);
+                            } else {
+                                var sourRect = new RectangleF(cutoutArea.Left, cutoutArea.Top, cutoutArea.Width, cutoutArea.Height);
+                                var destRect = new RectangleF(0, 0, imgWidth, imgHeight);
+
+                                graphic.DrawImage(bmp, sourRect, destRect);
+                            }
+                        }
+                        result = newImage;
+                    }
+                } finally {
+                    if (result != bmp)
+                        bmp.Dispose();
+                }
+
+                return new ImageHandler(result);
+            } finally {
+                stream.Close();
+            }
         }
 
         public IImage LoadImage(string fileName)
@@ -119,12 +154,12 @@ namespace GKUI.Platform
             }
         }
 
-        public IImage LoadResourceImage(Type baseType, string resName)
+        public IImage LoadResourceImage(Type baseType, string resName, ImageTarget target)
         {
             return new ImageHandler(new Bitmap(GKUtils.LoadResourceStream(baseType, resName)));
         }
 
-        public IImage LoadResourceImage(string resName, bool makeTransp = false)
+        public IImage LoadResourceImage(string resName, ImageTarget target, bool makeTransp = false)
         {
             if (string.IsNullOrEmpty(resName))
                 return null;
@@ -201,6 +236,11 @@ namespace GKUI.Platform
                 fontName = "Verdana";
             }
             return fontName;
+        }
+
+        public float GetDefaultFontSize()
+        {
+            return 8.0f;
         }
     }
 }

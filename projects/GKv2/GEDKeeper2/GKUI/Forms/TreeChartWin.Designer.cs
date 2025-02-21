@@ -25,6 +25,8 @@
         private System.Windows.Forms.ToolStripMenuItem miTraceKinships;
         private System.Windows.Forms.ToolStripMenuItem miCertaintyIndex;
         private System.Windows.Forms.ToolStripMenuItem miXRefVisible;
+        private System.Windows.Forms.ToolStripMenuItem miTrackSelectedLines;
+        private System.Windows.Forms.ToolStripMenuItem miTrackMatchedSources;
         private System.Windows.Forms.ToolStripMenuItem miRebuildTree;
         private System.Windows.Forms.ToolStripSeparator N8;
         private System.Windows.Forms.ToolStripMenuItem miFillColor;
@@ -59,9 +61,14 @@
         private System.Windows.Forms.ToolStripMenuItem miGoToPrimaryBranch;
         private System.Windows.Forms.ToolStripMenuItem miOpenInNewWindow;
         private System.Windows.Forms.ToolStripMenuItem miMergeDuplicates;
-
         private System.Windows.Forms.ToolStripSeparator N15;
         private System.Windows.Forms.ToolStripMenuItem miHideDescSpouses;
+        private System.Windows.Forms.ToolStripMenuItem miParentAges;
+        private System.Windows.Forms.ToolStripMenuItem miMaps;
+        private System.Windows.Forms.ToolStripSeparator N16;
+        private System.Windows.Forms.ToolStripMenuItem miMapAncestors;
+        private System.Windows.Forms.ToolStripMenuItem miMapDescendants;
+        private System.Windows.Forms.ToolStripMenuItem miMapAll;
 
         private void InitializeComponent()
         {
@@ -86,6 +93,8 @@
             this.miTraceKinships = new System.Windows.Forms.ToolStripMenuItem();
             this.miCertaintyIndex = new System.Windows.Forms.ToolStripMenuItem();
             this.miXRefVisible = new System.Windows.Forms.ToolStripMenuItem();
+            this.miTrackSelectedLines = new System.Windows.Forms.ToolStripMenuItem();
+            this.miTrackMatchedSources = new System.Windows.Forms.ToolStripMenuItem();
             this.N8 = new System.Windows.Forms.ToolStripSeparator();
             this.miFillColor = new System.Windows.Forms.ToolStripMenuItem();
             this.miFillImage = new System.Windows.Forms.ToolStripMenuItem();
@@ -124,6 +133,12 @@
             this.miMergeDuplicates = new System.Windows.Forms.ToolStripMenuItem();
             this.N15 = new System.Windows.Forms.ToolStripSeparator();
             this.miHideDescSpouses = new System.Windows.Forms.ToolStripMenuItem();
+            this.miParentAges = new System.Windows.Forms.ToolStripMenuItem();
+            this.miMaps = new System.Windows.Forms.ToolStripMenuItem();
+            this.N16 = new System.Windows.Forms.ToolStripSeparator();
+            this.miMapAncestors = new System.Windows.Forms.ToolStripMenuItem();
+            this.miMapDescendants = new System.Windows.Forms.ToolStripMenuItem();
+            this.miMapAll = new System.Windows.Forms.ToolStripMenuItem();
             this.ToolBar1.SuspendLayout();
             this.MenuModes.SuspendLayout();
             this.MenuPerson.SuspendLayout();
@@ -228,6 +243,9 @@
             this.miTraceKinships,
             this.miCertaintyIndex,
             this.miXRefVisible,
+            this.miTrackSelectedLines,
+            this.miTrackMatchedSources,
+            this.miParentAges,
             this.N8,
             this.miFillColor,
             this.miFillImage,
@@ -301,6 +319,27 @@
             this.miXRefVisible.Size = new System.Drawing.Size(186, 22);
             this.miXRefVisible.Text = "miXRefVisible";
             this.miXRefVisible.Click += new System.EventHandler(this.miXRefVisible_Click);
+            // 
+            // miTrackSelectedLines
+            // 
+            this.miTrackSelectedLines.Name = "miTrackSelectedLines";
+            this.miTrackSelectedLines.Size = new System.Drawing.Size(186, 22);
+            this.miTrackSelectedLines.Text = "miTrackSelectedLines";
+            this.miTrackSelectedLines.Click += new System.EventHandler(this.miTrackSelectedLines_Click);
+            // 
+            // miTrackMatchedSources
+            // 
+            this.miTrackMatchedSources.Name = "miTrackMatchedSources";
+            this.miTrackMatchedSources.Size = new System.Drawing.Size(186, 22);
+            this.miTrackMatchedSources.Text = "miTrackMatchedSources";
+            this.miTrackMatchedSources.Click += new System.EventHandler(this.miTrackMatchedSources_Click);
+            // 
+            // miParentAges
+            // 
+            this.miParentAges.Name = "miParentAges";
+            this.miParentAges.Size = new System.Drawing.Size(186, 22);
+            this.miParentAges.Text = "miParentAges";
+            this.miParentAges.Click += new System.EventHandler(this.miParentAges_Click);
             // 
             // N8
             // 
@@ -407,6 +446,8 @@
             this.miRebuildTree,
             this.miRebuildKinships,
             this.N10,
+            this.miMaps,
+            this.N16,
             this.miSelectColor});
             this.MenuPerson.Name = "MenuPerson";
             this.MenuPerson.Size = new System.Drawing.Size(173, 298);
@@ -536,6 +577,42 @@
             // 
             this.N10.Name = "N10";
             this.N10.Size = new System.Drawing.Size(169, 6);
+            // 
+            // miMaps
+            // 
+            this.miMaps.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.miMapAncestors,
+            this.miMapDescendants,
+            this.miMapAll});
+            this.miMaps.Name = "miMaps";
+            this.miMaps.Size = new System.Drawing.Size(172, 22);
+            this.miMaps.Text = "miMaps";
+            // 
+            // miMapAncestors
+            // 
+            this.miMapAncestors.Name = "miMapAncestors";
+            this.miMapAncestors.Size = new System.Drawing.Size(172, 22);
+            this.miMapAncestors.Text = "miMapAncestors";
+            this.miMapAncestors.Click += new System.EventHandler(this.miMapAncestors_Click);
+            // 
+            // miMapDescendants
+            // 
+            this.miMapDescendants.Name = "miMapDescendants";
+            this.miMapDescendants.Size = new System.Drawing.Size(172, 22);
+            this.miMapDescendants.Text = "miMapDescendants";
+            this.miMapDescendants.Click += new System.EventHandler(this.miMapDescendants_Click);
+            // 
+            // miMapAll
+            // 
+            this.miMapAll.Name = "miMapAll";
+            this.miMapAll.Size = new System.Drawing.Size(172, 22);
+            this.miMapAll.Text = "miMapAll";
+            this.miMapAll.Click += new System.EventHandler(this.miMapAll_Click);
+            // 
+            // N16
+            // 
+            this.N16.Name = "N16";
+            this.N16.Size = new System.Drawing.Size(169, 6);
             // 
             // miSelectColor
             // 

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -81,11 +81,6 @@ namespace GKUI.Forms
         private void btnSourceAdd_Click(object sender, EventArgs e)
         {
             fController.AddSource();
-        }
-
-        private void cbSource_KeyDown(object sender, KeyEventArgs e)
-        {
-            // dummy
         }
 
         private void cbSource_KeyUp(object sender, KeyEventArgs e)

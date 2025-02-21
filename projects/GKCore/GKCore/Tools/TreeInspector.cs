@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -20,6 +20,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GDModel.Providers.GEDCOM;
@@ -33,6 +34,8 @@ namespace GKCore.Tools
     public class TreeInspectionOptions
     {
         public bool CheckIndividualPlaces;
+        public bool CheckCensuses;
+        public bool CheckLinks;
     }
 
     /// <summary>
@@ -71,6 +74,9 @@ namespace GKCore.Tools
             cdUnknownPlaceOfPerson,
             cdHighSpousesDifference,
             cdHighSiblingsDifference,
+            cdMatchedCensus,
+            cdNoteWithoutLinks,
+            cdSourceWithoutLinks,
         }
 
         public enum CheckSolve
@@ -118,6 +124,14 @@ namespace GKCore.Tools
                     case GDMRecordType.rtFamily:
                         result = GKUtils.GetFamilyString(tree, (GDMFamilyRecord)Rec);
                         break;
+
+                    case GDMRecordType.rtNote:
+                        result = ((GDMNoteRecord)Rec).Lines[0]; // TODO: bad solution?!
+                        break;
+
+                    case GDMRecordType.rtSource:
+                        result = ((GDMSourceRecord)Rec).ShortTitle;
+                        break;
                 }
 
                 result = string.Concat(result, " [ ", Rec.XRef, " ]");
@@ -152,13 +166,13 @@ namespace GKCore.Tools
             for (int i = iRec.ChildToFamilyLinks.Count - 1; i >= 0; i--) {
                 var cfl = iRec.ChildToFamilyLinks[i];
                 if (cfl == null) {
-                    iRec.ChildToFamilyLinks.DeleteAt(i);
+                    iRec.ChildToFamilyLinks.RemoveAt(i);
                     continue;
                 }
 
                 GDMFamilyRecord family = tree.GetPtrValue(cfl);
                 if (family == null) {
-                    iRec.ChildToFamilyLinks.DeleteAt(i);
+                    iRec.ChildToFamilyLinks.RemoveAt(i);
                     continue;
                 }
 
@@ -178,13 +192,13 @@ namespace GKCore.Tools
             for (int i = iRec.SpouseToFamilyLinks.Count - 1; i >= 0; i--) {
                 var sfl = iRec.SpouseToFamilyLinks[i];
                 if (sfl == null) {
-                    iRec.SpouseToFamilyLinks.DeleteAt(i);
+                    iRec.SpouseToFamilyLinks.RemoveAt(i);
                     continue;
                 }
 
                 GDMFamilyRecord family = tree.GetPtrValue(sfl);
                 if (family == null) {
-                    iRec.SpouseToFamilyLinks.DeleteAt(i);
+                    iRec.SpouseToFamilyLinks.RemoveAt(i);
                     continue;
                 }
 
@@ -221,13 +235,13 @@ namespace GKCore.Tools
             for (int j = fRec.Children.Count - 1; j >= 0; j--) {
                 var cl = fRec.Children[j];
                 if (cl == null) {
-                    fRec.Children.DeleteAt(j);
+                    fRec.Children.RemoveAt(j);
                     continue;
                 }
 
                 GDMIndividualRecord child = tree.GetPtrValue(cl);
                 if (child == null) {
-                    fRec.Children.DeleteAt(j);
+                    fRec.Children.RemoveAt(j);
                     continue;
                 }
 
@@ -265,7 +279,10 @@ namespace GKCore.Tools
 
             CheckIndividualLinks(tree, iRec, checksList);
 
-            if (iRec.FindEvent(GEDCOMTagType.DEAT) == null) {
+            var evtBirth = iRec.FindEvent(GEDCOMTagType.BIRT);
+            var evtDeath = iRec.FindEvent(GEDCOMTagType.DEAT);
+
+            if (evtDeath == null) {
                 int age = GKUtils.GetAge(iRec, -1);
 
                 if (age != -1 && age >= GKData.PROVED_LIFE_LENGTH) {
@@ -282,8 +299,8 @@ namespace GKCore.Tools
                 checksList.Add(checkObj);
             }
 
-            int yBirth = iRec.GetChronologicalYear(GEDCOMTagName.BIRT);
-            int yDeath = iRec.GetChronologicalYear(GEDCOMTagName.DEAT);
+            int yBirth = (evtBirth == null) ? 0 : evtBirth.GetChronologicalYear();
+            int yDeath = (evtDeath == null) ? 0 : evtDeath.GetChronologicalYear();
             if (yBirth != 0 && yDeath != 0) {
                 int delta = (yDeath - yBirth);
                 if (delta < 0) {
@@ -314,8 +331,20 @@ namespace GKCore.Tools
                 checksList.Add(checkObj);
             }
 
-            if (options != null && options.CheckIndividualPlaces) {
-                CheckIndividualPlaces(iRec, checksList);
+            if (options != null) {
+                if (options.CheckIndividualPlaces) {
+                    CheckIndividualPlaces(iRec, checksList);
+                }
+
+                // FIXME: skip individuals with sources (temp solution!)
+                if (options.CheckCensuses && !iRec.HasSourceCitations && (evtBirth != null || evtDeath != null)) {
+                    var res = Censuses.Instance.FindMatchedIndividualCensuses(evtBirth, evtDeath);
+                    foreach (var cens in res) {
+                        CheckObj checkObj = new CheckObj(iRec, CheckDiag.cdMatchedCensus, CheckSolve.csSkip);
+                        checkObj.Comment = string.Format(LangMan.LS(LSID.PersonCanBeFoundInCensus), cens.Name);
+                        checksList.Add(checkObj);
+                    }
+                }
             }
         }
 
@@ -452,6 +481,85 @@ namespace GKCore.Tools
             }
         }
 
+        private static bool CheckStructLinks(IGDMStructWithLists strWL, GDMRecord subject)
+        {
+            switch (subject.RecordType) {
+                case GDMRecordType.rtNote:
+                    if (strWL.HasNotes) {
+                        for (int i = 0, num = strWL.Notes.Count; i < num; i++) {
+                            if (strWL.Notes[i].XRef == subject.XRef) {
+                                return true;
+                            }
+                        }
+                    }
+                    break;
+
+                case GDMRecordType.rtMultimedia:
+                    if (strWL.HasMultimediaLinks) {
+                        for (int i = 0, num = strWL.MultimediaLinks.Count; i < num; i++) {
+                            if (strWL.MultimediaLinks[i].XRef == subject.XRef) {
+                                return true;
+                            }
+                        }
+                    }
+                    break;
+
+                case GDMRecordType.rtSource:
+                    if (strWL.HasSourceCitations) {
+                        for (int i = 0, num = strWL.SourceCitations.Count; i < num; i++) {
+                            var sourCit = strWL.SourceCitations[i];
+                            if (sourCit.XRef == subject.XRef) {
+                                return true;
+                            }
+                        }
+                    }
+                    break;
+            }
+
+            return false;
+        }
+
+        private static bool CheckRecordLinks(IBaseContext baseContext, GDMRecord subject)
+        {
+            var tree = baseContext.Tree;
+            for (int k = 0, num2 = tree.RecordsCount; k < num2; k++) {
+                GDMRecord record = tree[k];
+
+                if (CheckStructLinks(record, subject))
+                    return true;
+
+                var evsRec = record as GDMRecordWithEvents;
+                if (evsRec != null && evsRec.HasEvents) {
+                    for (int i = 0, num = evsRec.Events.Count; i < num; i++) {
+                        if (CheckStructLinks(evsRec.Events[i], subject))
+                            return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static void CheckNoteRecord(IBaseContext baseContext, GDMNoteRecord noteRec, List<CheckObj> checksList)
+        {
+            if (!CheckRecordLinks(baseContext, noteRec)) {
+                CheckObj checkObj = new CheckObj(noteRec, CheckDiag.cdNoteWithoutLinks, CheckSolve.csRemove);
+                checkObj.Comment = LangMan.LS(LSID.NoteWithoutLinks);
+                checksList.Add(checkObj);
+                return;
+            }
+        }
+
+        private static void CheckSourceRecord(IBaseContext baseContext, GDMSourceRecord sourRec, List<CheckObj> checksList)
+        {
+            if (!CheckRecordLinks(baseContext, sourRec)) {
+                CheckObj checkObj = new CheckObj(sourRec, CheckDiag.cdSourceWithoutLinks, CheckSolve.csRemove);
+                checkObj.Comment = LangMan.LS(LSID.SourceWithoutLinks);
+                checksList.Add(checkObj);
+                return;
+            }
+        }
+
         public static void CheckBase(IBaseWindow baseWin, List<CheckObj> checksList, IProgressController progress, TreeInspectionOptions options = null)
         {
             if (baseWin == null)
@@ -460,9 +568,13 @@ namespace GKCore.Tools
             if (checksList == null)
                 throw new ArgumentNullException("checksList");
 
+            Censuses.Instance.Load(GKUtils.GetExternalsPath() + "censuses\\Russia.yaml");
+
+            bool checkLinks = (options != null && options.CheckLinks);
+
             try {
                 GDMTree tree = baseWin.Context.Tree;
-                progress.Begin(LangMan.LS(LSID.ToolOp_7), tree.RecordsCount);
+                progress.Begin(LangMan.LS(LSID.TreeCheck), tree.RecordsCount);
                 checksList.Clear();
 
                 for (int i = 0, num = tree.RecordsCount; i < num; i++) {
@@ -481,6 +593,14 @@ namespace GKCore.Tools
                         case GDMRecordType.rtMultimedia:
                             CheckMultimediaRecord(baseWin.Context, rec as GDMMultimediaRecord, checksList);
                             break;
+
+                        case GDMRecordType.rtNote:
+                            if (checkLinks) CheckNoteRecord(baseWin.Context, rec as GDMNoteRecord, checksList);
+                            break;
+
+                        case GDMRecordType.rtSource:
+                            if (checkLinks) CheckSourceRecord(baseWin.Context, rec as GDMSourceRecord, checksList);
+                            break;
                     }
                 }
             } finally {
@@ -488,7 +608,7 @@ namespace GKCore.Tools
             }
         }
 
-        public static void RepairProblem(IView owner, IBaseWindow baseWin, CheckObj checkObj)
+        public static async Task RepairProblem(IView owner, IBaseWindow baseWin, CheckObj checkObj)
         {
             if (baseWin == null)
                 throw new ArgumentNullException("baseWin");
@@ -508,7 +628,7 @@ namespace GKCore.Tools
 
                 case CheckDiag.cdPersonSexless: {
                         var iRec = checkObj.Rec as GDMIndividualRecord;
-                        baseWin.Context.CheckPersonSex(owner, iRec);
+                        await baseWin.Context.CheckPersonSex(owner, iRec);
                         baseWin.NotifyRecord(iRec, RecordAction.raEdit);
                     }
                     break;
@@ -531,13 +651,13 @@ namespace GKCore.Tools
 
                 case CheckDiag.cdDuplicateChildren:
                     if (checkObj.Solve == CheckSolve.csEdit) {
-                        BaseController.EditRecord(owner, baseWin, checkObj.Rec);
+                        await BaseController.EditRecord(owner, baseWin, checkObj.Rec);
                     }
                     break;
 
                 case CheckDiag.csDateInvalid:
                     if (checkObj.Solve == CheckSolve.csEdit) {
-                        BaseController.EditRecord(owner, baseWin, checkObj.Rec);
+                        await BaseController.EditRecord(owner, baseWin, checkObj.Rec);
                     }
                     break;
 
@@ -633,6 +753,11 @@ namespace GKCore.Tools
 
                         CheckAndRepairGarbledSpouses(tree, famRec);
                     }
+                    break;
+
+                case CheckDiag.cdNoteWithoutLinks:
+                case CheckDiag.cdSourceWithoutLinks:
+                    tree.DeleteRecord(checkObj.Rec);
                     break;
             }
         }
@@ -751,7 +876,7 @@ namespace GKCore.Tools
         private static string CheckCycle(GDMTree tree, GDMIndividualRecord iRec)
         {
             var stack = new Stack<GDMIndividualRecord>();
-            GDMIndividualRecord hasCycle = null;
+            GDMIndividualRecord hasCycle;
             var indiDCFlags = new GKVarCache<GDMIndividualRecord, int>();
 
             if (!HasIndiFlag(indiDCFlags, iRec, DCFlag.dcfAncWalk)) {

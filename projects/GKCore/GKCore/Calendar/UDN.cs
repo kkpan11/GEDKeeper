@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2016-2023 by Sergey V. Zhdanovskih, Ruslan Garipov.
+ *  Copyright (C) 2016-2025 by Sergey V. Zhdanovskih, Ruslan Garipov.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,6 +19,7 @@
  */
 
 using System;
+using System.Runtime.CompilerServices;
 using BSLib;
 
 namespace GKCore.Calendar
@@ -32,6 +33,9 @@ namespace GKCore.Calendar
     /// </summary>
     public struct UDN : ICloneable<UDN>, IComparable, IComparable<UDN>, IEquatable<UDN>
     {
+        public static readonly UDN Empty = new UDN(0);
+        public static readonly UDN Unknown = new UDN(UDNCalendarType.ctGregorian, UnknownYear, UnknownMonth, UnknownDay);
+
         private const int IgnoreYear = 1 << 31;
         private const int IgnoreMonth = 1 << 30;
         private const int IgnoreDay = 1 << 29;
@@ -204,6 +208,7 @@ namespace GKCore.Calendar
         /// <param name="r">The right value to compare</param>
         /// <returns>'-1' when the `l` is less than the `r`, '1' when the `l` is greater than the `r` and '0' when
         /// the `l` and the `r` are equal.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int CompareVal(int l, int r)
         {
             int result = 0;
@@ -319,7 +324,7 @@ namespace GKCore.Calendar
         }
 
         /// <summary>
-        /// Calculates Julian day nubmer (JDN, https://en.wikipedia.org/wiki/Julian_day) using the specified date in
+        /// Calculates Julian day number (JDN, https://en.wikipedia.org/wiki/Julian_day) using the specified date in
         /// the specified <paramref name="calendar"/>.
         /// Return value of this method ain't a usual JDN. See Returns section for more information.
         /// </summary>
@@ -336,6 +341,7 @@ namespace GKCore.Calendar
         ///
         /// This method doesn't change the 27th and 28th bit ("date before" and "date after").
         /// </returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int CreateVal(UDNCalendarType calendar, int year, int month, int day)
         {
             int result = 0;
@@ -517,16 +523,6 @@ namespace GKCore.Calendar
                 (IgnoreDay & left.fValue) & (IgnoreDay & right.fValue) &
                 ~(ApproximateDate | DateBefore | DateAfter);
             return new UDN(value);
-        }
-
-        public static UDN CreateEmpty()
-        {
-            return new UDN(0);
-        }
-
-        public static UDN CreateUnknown()
-        {
-            return new UDN(UDNCalendarType.ctGregorian, UnknownYear, UnknownMonth, UnknownDay);
         }
 
         #endregion

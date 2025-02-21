@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2011-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2011-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -101,7 +101,7 @@ namespace GKUI.Components
             fCurrentLink = null;
             fHeights = new List<int>();
             fLines = new StringList();
-            fLines.OnChange += LinesChanged;
+            fLines.OnChange += new NotifyEventHandler(LinesChanged);
             fLinkColor = SystemColors.LinkText;
             fTextSize = ExtSize.Empty;
             fWordWrap = true;
@@ -304,7 +304,7 @@ namespace GKUI.Components
                 SolidBrush brush = new SolidBrush(this.TextColor);
                 Font font = null;
                 try {
-                    gfx.FillRectangle(new SolidBrush(BackgroundColor), Viewport);
+                    gfx.FillRectangle(new SolidBrush(BackgroundColor), UIHelper.Rt2Rt(Viewport));
 
                     var scrollPos = ImageViewport;
                     int xOffset = fBorderWidth + scrollPos.Left;

@@ -36,7 +36,7 @@ namespace GKMap.WinForms
     /// <summary>
     /// GKMap control for Windows Forms
     /// </summary>   
-    public class GMapControl : UserControl, IMapControl
+    public class GMapControl : UserControl, IMapControlEx
     {
         public static readonly bool IsDesignerHosted = LicenseManager.UsageMode == LicenseUsageMode.Designtime;
 
@@ -76,20 +76,14 @@ namespace GKMap.WinForms
         public string CacheLocation
         {
             get {
-#if !DESIGN
                 return GMaps.CacheLocation;
-#else
-                return string.Empty;
-#endif
             }
             set {
-#if !DESIGN
                 GMaps.CacheLocation = value;
-#endif
             }
         }
 
-        MapCore IMapControl.Core { get { return fCore; } }
+        MapCore IMapControlEx.Core { get { return fCore; } }
 
         /// <summary>
         /// stops immediate marker/route/polygon invalidation;
@@ -253,15 +247,7 @@ namespace GKMap.WinForms
             }
             set {
                 if (fCore.Zoom != value) {
-                    Debug.WriteLine("ZoomPropertyChanged: " + fCore.Zoom + " -> " + value);
-
-                    if (value > MaxZoom) {
-                        fCore.Zoom = MaxZoom;
-                    } else if (value < MinZoom) {
-                        fCore.Zoom = MinZoom;
-                    } else {
-                        fCore.Zoom = value;
-                    }
+                    fCore.Zoom = value;
 
                     if (fCore.IsStarted && !fCore.IsDragging) {
                         fCore.ForceUpdateOverlays();
@@ -284,45 +270,6 @@ namespace GKMap.WinForms
             }
             remove {
                 fCore.OnCurrentPositionChanged -= value;
-            }
-        }
-
-        /// <summary>
-        /// occurs when tile set load is complete
-        /// </summary>
-        public event TileLoadComplete OnTileLoadComplete
-        {
-            add {
-                fCore.OnTileLoadComplete += value;
-            }
-            remove {
-                fCore.OnTileLoadComplete -= value;
-            }
-        }
-
-        /// <summary>
-        /// occurs when tile set is starting to load
-        /// </summary>
-        public event TileLoadStart OnTileLoadStart
-        {
-            add {
-                fCore.OnTileLoadStart += value;
-            }
-            remove {
-                fCore.OnTileLoadStart -= value;
-            }
-        }
-
-        /// <summary>
-        /// occurs on map drag
-        /// </summary>
-        public event MapDrag OnMapDrag
-        {
-            add {
-                fCore.OnMapDrag += value;
-            }
-            remove {
-                fCore.OnMapDrag -= value;
             }
         }
 
@@ -470,10 +417,6 @@ namespace GKMap.WinForms
             }
         }
 
-#if !DESIGN
-        /// <summary>
-        /// constructor
-        /// </summary>
         public GMapControl()
         {
             fCore = new MapCore(this);
@@ -503,8 +446,6 @@ namespace GKMap.WinForms
                 Overlays.CollectionChanged += Overlays_CollectionChanged;
             }
         }
-
-#endif
 
         protected override void Dispose(bool disposing)
         {
@@ -584,10 +525,10 @@ namespace GKMap.WinForms
                 fCore.LastInvalidation = DateTime.Now;
             }
 
-            base.Refresh();
+            // FIXME
+            BeginInvoke(new Action(base.Refresh), null);
         }
 
-#if !DESIGN
         /// <summary>
         /// enqueue built-in thread safe invalidation
         /// </summary>
@@ -597,7 +538,6 @@ namespace GKMap.WinForms
                 fCore.RefreshEvent.Set();
             }
         }
-#endif
 
         /// <summary>
         /// sets to max zoom to fit all markers and centers them in map
@@ -606,8 +546,7 @@ namespace GKMap.WinForms
         /// <returns></returns>
         public bool ZoomAndCenterMarkers(string overlayId)
         {
-            bool result = fCore.ZoomAndCenterMarkers(overlayId);
-            return result;
+            return fCore.ZoomAndCenterMarkers(overlayId);
         }
 
         /// <summary>
@@ -867,8 +806,7 @@ namespace GKMap.WinForms
 
             if (fCore.IsDragging) {
                 SetCursorDrag();
-                fCore.MouseCurrent = new GPoint(e.X, e.Y);
-                fCore.Drag(fCore.MouseCurrent);
+                fCore.Drag(e.X, e.Y);
                 base.Invalidate();
             } else {
                 if (fCore.MouseDown.IsEmpty) {
@@ -1027,34 +965,22 @@ namespace GKMap.WinForms
         void IMapControl.DoMouseClick(MapObject obj, EventArgs e)
         {
             if (obj is MapMarker) {
-                if (OnMarkerClick != null) {
-                    OnMarkerClick(obj as MapMarker, (MouseEventArgs)e);
-                }
+                OnMarkerClick?.Invoke(obj as MapMarker, (MouseEventArgs)e);
             } else if (obj is MapRoute) {
-                if (OnRouteClick != null) {
-                    OnRouteClick(obj as MapRoute, (MouseEventArgs)e);
-                }
+                OnRouteClick?.Invoke(obj as MapRoute, (MouseEventArgs)e);
             } else if (obj is MapPolygon) {
-                if (OnPolygonClick != null) {
-                    OnPolygonClick(obj as MapPolygon, (MouseEventArgs)e);
-                }
+                OnPolygonClick?.Invoke(obj as MapPolygon, (MouseEventArgs)e);
             }
         }
 
         void IMapControl.DoMouseDoubleClick(MapObject obj, EventArgs e)
         {
             if (obj is MapMarker) {
-                if (OnMarkerDoubleClick != null) {
-                    OnMarkerDoubleClick(obj as MapMarker, (MouseEventArgs)e);
-                }
+                OnMarkerDoubleClick?.Invoke(obj as MapMarker, (MouseEventArgs)e);
             } else if (obj is MapRoute) {
-                if (OnRouteDoubleClick != null) {
-                    OnRouteDoubleClick(obj as MapRoute, (MouseEventArgs)e);
-                }
+                OnRouteDoubleClick?.Invoke(obj as MapRoute, (MouseEventArgs)e);
             } else if (obj is MapPolygon) {
-                if (OnPolygonDoubleClick != null) {
-                    OnPolygonDoubleClick(obj as MapPolygon, (MouseEventArgs)e);
-                }
+                OnPolygonDoubleClick?.Invoke(obj as MapPolygon, (MouseEventArgs)e);
             }
         }
 

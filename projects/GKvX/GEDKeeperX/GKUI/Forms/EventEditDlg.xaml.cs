@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -74,19 +74,14 @@ namespace GKUI.Forms
             get { return GetControlHandler<ITextBox>(txtEventPlace); }
         }
 
-        ITextBox IEventEditDlg.EventName
+        IComboBox IEventEditDlg.Cause
         {
-            get { return  GetControlHandler<ITextBox>(txtEventName); }
+            get { return  GetControlHandler<IComboBox>(txtEventCause); }
         }
 
-        ITextBox IEventEditDlg.Cause
+        IComboBox IEventEditDlg.Agency
         {
-            get { return  GetControlHandler<ITextBox>(txtEventCause); }
-        }
-
-        ITextBox IEventEditDlg.Agency
-        {
-            get { return  GetControlHandler<ITextBox>(txtEventOrg); }
+            get { return  GetControlHandler<IComboBox>(txtEventOrg); }
         }
 
         #endregion

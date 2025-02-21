@@ -14,7 +14,6 @@
               <Label x:Name="lblEvent" />
               <StackLayout Orientation="Horizontal" Spacing="4">
                 <ComboBox x:Name="cmbEventType" Width="180" ReadOnly="True" SelectedIndexChanged="EditEventType_SelectedIndexChanged" />
-                <TextBox x:Name="txtEventName" Width="200" />
               </StackLayout>
             </TableRow>
 
@@ -41,12 +40,12 @@
 
             <TableRow>
               <Label x:Name="lblCause" />
-              <TextBox x:Name="txtEventCause" />
+              <ComboBox x:Name="txtEventCause" />
             </TableRow>
 
             <TableRow>
               <Label x:Name="lblOrg" />
-              <TextBox x:Name="txtEventOrg" />
+              <ComboBox x:Name="txtEventOrg" />
             </TableRow>
 
             <TableRow ScaleHeight="True" />
@@ -66,17 +65,11 @@
     </TableRow>
 
     <TableRow>
-      <StackLayout Spacing="8" Orientation="Horizontal">
-        <StackLayoutItem HorizontalAlignment="Left">
-          <Button x:Name="btnAddress" Style="dlgBtn" Click="btnAddress_Click" />
-        </StackLayoutItem>
+      <StackLayout Style="dlgFooter">
+        <Button x:Name="btnAddress" Style="dlgBtn" Click="btnAddress_Click" />
         <StackLayoutItem Expand="True" />
-        <StackLayoutItem HorizontalAlignment="Right">
-          <Button x:Name="btnAccept" Style="dlgBtn" Image="{Resource Resources.btn_accept.gif, GKCore}" Click="AcceptClickHandler" />
-        </StackLayoutItem>
-        <StackLayoutItem HorizontalAlignment="Right">
-          <Button x:Name="btnCancel" Style="dlgBtn" Image="{Resource Resources.btn_cancel.gif, GKCore}" Click="CancelClickHandler" />
-        </StackLayoutItem>
+        <Button x:Name="btnAccept" Style="dlgBtn" Image="{Resource Resources.btn_accept.gif, GKCore}" Click="AcceptClickHandler" />
+        <Button x:Name="btnCancel" Style="dlgBtn" Image="{Resource Resources.btn_cancel.gif, GKCore}" Click="CancelClickHandler" />
       </StackLayout>
     </TableRow>
 

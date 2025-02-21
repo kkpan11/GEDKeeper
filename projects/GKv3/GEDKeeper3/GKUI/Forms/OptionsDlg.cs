@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -28,6 +28,7 @@ using GKCore.Design.Controls;
 using GKCore.Design.Graphics;
 using GKCore.Design.Views;
 using GKCore.Interfaces;
+using GKCore.Lists;
 using GKCore.Options;
 using GKUI.Components;
 using GKUI.Platform.Handlers;
@@ -201,14 +202,37 @@ namespace GKUI.Forms
         private ComboBox cmbDescendNumbering;
         private Label lblAscendNumbering;
         private ComboBox cmbAscendNumbering;
+        private CheckBox chkExtendedLocations;
+        private CheckBox chkELAbbreviatedNames;
+        private CheckBox chkReversePlacesOrder;
+        private TabPage pageEventTypes;
+        private GKSheetList slEventTypes;
+        private CheckBox chkFullNameOnOneLine;
+        private Label lblMatchPatternMethod;
+        private ComboBox cmbMatchPatternMethod;
+        private CheckBox chkSourcePages;
+        private TabPage pageNavigation;
+        private CheckBox chkPortraits;
 
 #pragma warning restore CS0169, CS0649, IDE0044, IDE0051
+        #endregion
+
+
+        #region View Interface
+
+        ISheetList IOptionsDlg.EventTypesList
+        {
+            get { return slEventTypes; }
+        }
+
         #endregion
 
 
         public OptionsDlg(IHost host)
         {
             XamlReader.Load(this);
+
+            PageControl1.SelectedIndexChanged += PageControl_SelectedIndexChanged;
 
             UIHelper.FixRadioButtons(this, grpFileBackup);
             UIHelper.FixRadioButtons(this, rgFNPFormat);
@@ -232,6 +256,15 @@ namespace GKUI.Forms
             chkSeparateDepth_CheckedChanged(null, null);
         }
 
+        private void PageControl_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (PageControl1.SelectedPage == pageEventTypes) {
+                fController.ChangeTab();
+            }
+
+            btnResetDefaults.Enabled = PageControl1.SelectedIndex < 6;
+        }
+
         void IOptionsDlg.UpdateCircleChartsOptions()
         {
             ancOptionsControl1.Options = fController.Options.CircleChartOptions;
@@ -253,13 +286,13 @@ namespace GKUI.Forms
             fController.SelectLabColor(GetControlHandler<ILabel>(sender as Label));
         }
 
-        private void panDefFont_Click(object sender, EventArgs e)
+        private async void panDefFont_Click(object sender, EventArgs e)
         {
             TreeChartOptions chartOptions = fController.Options.TreeChartOptions;
 
             var sdFont = new Font(chartOptions.DefFontName, chartOptions.DefFontSize);
             IFont font = new FontHandler(sdFont);
-            font = AppHost.StdDialogs.SelectFont(font);
+            font = await AppHost.StdDialogs.SelectFont(font);
             if (font != null) {
                 chartOptions.DefFontName = font.Name;
                 chartOptions.DefFontSize = (int)(Math.Round(font.Size));

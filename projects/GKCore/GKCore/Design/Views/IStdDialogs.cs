@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -28,27 +28,24 @@ namespace GKCore.Design.Views
     /// </summary>
     public interface IStdDialogs
     {
-        bool GetInput(object owner, string prompt, ref string value);
-        Task<string> GetInputAsync(object owner, string prompt);
+        Task<string> GetInput(object owner, string prompt, string value);
 
-        string GetOpenFile(string title, string context, string filter,
-                           int filterIndex, string defaultExt);
+        Task<string> GetOpenFile(string title, string context, string filter, int filterIndex, string defaultExt);
 
-        Task<string> GetOpenFileAsync(string title, string context, string filter,
-                                  int filterIndex, string defaultExt);
+        Task<string[]> GetOpenFiles(string title, string context, string filter, int filterIndex, string defaultExt);
 
-        bool GetPassword(string prompt, ref string value);
+        Task<string> GetPassword(string prompt);
 
-        string GetSaveFile(string filter);
+        //Task<string> GetSaveFile(string filter);
 
-        string GetSaveFile(string context, string filter);
+        Task<string> GetSaveFile(string context, string filter);
 
-        string GetSaveFile(string title, string context, string filter, int filterIndex, string defaultExt,
-                           string suggestedFileName, bool overwritePrompt = true);
+        Task<string> GetSaveFile(string title, string context, string filter, int filterIndex, string defaultExt,
+                                 string suggestedFileName, bool overwritePrompt = true);
 
-        IColor SelectColor(IColor color);
+        Task<IColor> SelectColor(IColor color);
 
-        IFont SelectFont(IFont font);
+        Task<IFont> SelectFont(IFont font);
 
         void ShowAlert(string msg, string title = "");
 
@@ -56,9 +53,7 @@ namespace GKCore.Design.Views
 
         void ShowMessage(string msg, string title = "");
 
-        bool ShowQuestion(string msg, string title = "");
-
-        Task<bool> ShowQuestionAsync(string msg, string title = "");
+        Task<bool> ShowQuestion(string msg, string title = "");
 
         void ShowWarning(string msg, string title = "");
     }

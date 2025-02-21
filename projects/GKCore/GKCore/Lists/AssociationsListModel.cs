@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,14 +18,15 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
-using GKCore.Interfaces;
-using GKCore.Design.Views;
-using GKCore.Operations;
-using GKCore.Types;
 using GKCore.Design;
+using GKCore.Design.Views;
+using GKCore.Interfaces;
+using GKCore.Operations;
+using GKCore.Options;
+using GKCore.Types;
 
 namespace GKCore.Lists
 {
@@ -36,16 +37,29 @@ namespace GKCore.Lists
     {
         private GDMIndividualRecord fRelIndi;
 
-        public AssociationsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        public AssociationsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete,
                 RecordAction.raJump,
-                RecordAction.raCopy, RecordAction.raPaste);
+                RecordAction.raCopy, RecordAction.raPaste, RecordAction.raDetails);
+        }
 
-            fListColumns.AddColumn(LSID.Relation, 300, false);
-            fListColumns.AddColumn(LSID.Person, 200, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stIndividualAssociations);
+
+            result.AddColumn(LSID.Relation, 300, false);
+            result.AddColumn(LSID.Person, 200, false);
+
+            result.ResetDefaults();
+            return result;
+        }
+
+        protected override GDMRecord GetReferenceRecord(object itemData)
+        {
+            var ast = itemData as GDMAssociation;
+            return (ast == null) ? null : fBaseContext.Tree.GetPtrValue<GDMIndividualRecord>(ast);
         }
 
         public override void Fetch(GDMAssociation aRec)
@@ -71,16 +85,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var person = fDataOwner as GDMIndividualRecord;
-            if (person == null) return;
-
-            try {
+            if (person != null)
                 UpdateStructList(person.Associations);
-            } catch (Exception ex) {
-                Logger.WriteError("AssociationsListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var person = fDataOwner as GDMIndividualRecord;
             if (fBaseWin == null || person == null) return;
@@ -91,15 +100,16 @@ namespace GKCore.Lists
 
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                case RecordAction.raEdit:
-                    using (var dlg = AppHost.ResolveDialog<IAssociationEditDlg>(fBaseWin)) {
+                case RecordAction.raEdit: {
                         bool exists = (ast != null);
                         if (!exists) {
                             ast = new GDMAssociation();
                         }
 
-                        dlg.Association = ast;
-                        result = AppHost.Instance.ShowModalX(dlg, fOwner, false);
+                        using (var dlg = AppHost.ResolveDialog<IAssociationEditDlg>(fBaseWin)) {
+                            dlg.Association = ast;
+                            result = await AppHost.Instance.ShowModalAsync(dlg, fOwner, false);
+                        }
 
                         if (!exists) {
                             if (result) {
@@ -112,7 +122,7 @@ namespace GKCore.Lists
                     break;
 
                 case RecordAction.raDelete:
-                    if (AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.RemoveAssociationQuery))) {
+                    if (await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.RemoveAssociationQuery))) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otIndividualAssociationRemove, person, ast);
                     }
                     break;

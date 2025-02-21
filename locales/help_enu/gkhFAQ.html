@@ -1,9 +1,8 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <link rel="stylesheet" href="styles.css" type="text/css" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <link rel="stylesheet" href="../help/styles.css" type="text/css">
     <title>Frequently Asked Questions</title>
 </head>
 <body>
@@ -15,7 +14,7 @@
         <dd>There is no limit to the number of records in the program's database. A large database size, about ten thousand records, may hinder program performance. This will be addressed in a future release.</dd>
 
         <dt>2. Can I add source references to each person, family, and event?</dt>
-        <dd>You have no limits when attaching source references to person, family, and other objects&#151;including all events and cases. All references to sources may be grouped by archives.</dd>
+        <dd>You have no limits when attaching source references to person, family, and other objects&mdash;including all events and cases. All references to sources may be grouped by archives.</dd>
 
         <dt>3. I need to record data about unrelated persons, which lived in a single community and were, at most, relatives of each other in the past, but this was not revealed quickly. Can I do this with GEDKeeper?</dt>
         <dd>The program has no limits for storing unrelated persons. In fact, having unrelated persons in the database was an initial program requirement.</dd>
@@ -27,7 +26,7 @@
                 <li>
                     Three types of trees: ancestors, descendants, and combined. Other types are not yet implemented
                     currently but can be added later when number of requests increases. GEDKeeper can print trees itself, and you can
-                    export a tree to a JPG, WMF, or SVG graphics file then print such a file from an external application.
+                    export a tree to a JPG, BMP, GIF, PNG, WMF, SVG, PDF graphics file then print such a file from an external application.
                 </li>
 
                 <li>
@@ -62,7 +61,7 @@
             To create such lists, you can use one of the following methods:
             <ul>
                 <li>
-                    Sort a list by clicking a column header. Ascending and descending order sorting is implemented in all lists in the program&#151;including age, sex, and
+                    Sort a list by clicking a column header. Ascending and descending order sorting is implemented in all lists in the program&mdash;including age, sex, and
                     place of residence columns.
                 </li>
 
@@ -97,9 +96,81 @@
             information about a person while you need to handle a large number of persons. You enter only some main information and put aside adding information about
             relationships and other secondary data.
         </dd>
+
+        <dt>9. How to mark a person whose existence or location on the tree is in doubt?</dt>
+        <dd>
+            There are two main options:
+            <ul>
+                <li>
+                    Bookmark the person (person edit dialog). But since this is just a bookmark, over time it may become unclear what exactly the bookmark meant.
+                </li>
+                <li>
+                    You can create several groups for different purposes: "In question", "Killed in WWII", "Special search", "Conflict".
+                    And include the person, if necessary, in one or more necessary groups. This will allow you to categorize the entire array of information by various criteria
+                    and quickly find the right people.
+                </li>
+            </ul>
+        </dd>
+
+        <dt>10. If there is a bilingual (multilingual) tree, is it possible to somehow quickly switch the display of names and surnames to another language (all at once)?</dt>
+        <dd>
+            If the names in the database were entered in several different languages, then quickly switching the display of all names in the list to another language
+            is possible in the "Languages" item of the Navigator plugin (menu Plugins\Navigator). If some person does not have a name in the required language, the one that is available will be displayed.
+        </dd>
+
+        <dt>11. How to specify godparents (godfathers), witnesses (guarantors)?</dt>
+        <dd>
+            For this kind of information, there is a special form of entries - "Associations" in the dialog for editing persons. When entering associations, you can specify
+            the type and link to a specific person.
+        </dd>
+
+        <dt>12. What should be displayed in the drop-down list of patronymics when adding/editing a person? Expected the latest entered values, but the list is always empty.</dt>
+        <dd>
+            The drop-down list for patronymics does not show the latest entered values, but options when a new person is added from the parents' family - in this case, by the father's name,
+            the female and male patronymics are automatically substituted - if the program has previously recorded a combination of the desired name and one of the patronymic forms (like self-training).
+            Adding a child from the parents' family works either in the family editing dialog, or when adding a son/daughter from one of the parents in the tree diagram by right-clicking.
+        </dd>
+
+        <dt>13. Is it possible to rearrange the numbers of records in a database loaded from a third-party source (numbers with large gaps, very large values, etc.)?</dt>
+        <dd>
+            The easiest way to rearrange all identifiers at the user level is to do the following:
+            <ol>
+                <li>Create a new empty database file, save it with a new name;</li>
+                <li>Perform the database merge operation (menu Service\Tools). That is, merge the current database with the identifiers you don't like into the new empty one. Not vice versa.</li>
+            </ol>
+            When merging, the entire data structure remains the same. The order of records, internal content, all relationships. Merging always only "adds" files.
+            No attempts are made to merge duplicate records together. This is the task of a separate function. The only thing that changes during merging is the numbers/identifiers from the merging database.
+        </dd>
+
+        <dt>14. What are the differences between versions 2.XX and 3.XX? Do I understand correctly that they have the same functionality, but are written for different OS?</dt>
+        <dd>
+            <p>Versions 2.XX are based on .NET Framework and can only run on Windows (7/8/8.1/10/11).</p>
+            <p>Versions 3.XX are implemented on the basis of .NET Core + EtoForms and <i>were planned as a complete replacement (cross-platform)</i> for Windows, Linux, MacOS, etc. - <i>with the complete cessation of development of 2.XX</i>Versions 3.XX are implemented on the basis of .NET Core + EtoForms and <i>were planned as a complete replacement (cross-platform)</i> for Windows, Linux, MacOS, etc. - <i>with the complete cessation of development of 2.XX</i>.</p>
+            <p>
+                But over time, it was discovered that .NET Core is constantly removing support for decommissioned OS versions, including Windows.
+                Because of this, there are numerous compatibility issues between GEDKeeper 3.XX and Win7/8/8.1.<ul>
+                    <li>dialogues are not centered correctly, they shift;</li>
+                    <li>print preview is very buggy;</li>
+                    <li>slightly slower than tree diagram graphics (but smoother and more accurate);</li>
+                    <li>data output is slower and data highlighting does not work in table views of the main window;</li>
+                    <li>interface themes are not possible;</li>
+                    <li>some graphic files (rare jpg, tif, bmp) are less supported;</li>
+                </ul>
+            </p>
+
+            <p>
+                Therefore, until the moment when (or if) there is nothing to choose from (restrictions, loss of the ability to use some option) - it was decided to develop both lines.
+                This is very labor-intensive. But if in Linux you can only use 3.XX, then in Windows it is inconvenient to use it - and this is on Win10/11.
+            </p>
+
+            <p>So for all versions of Windows I recommend using 2.XX - it is more stable and the interface is more efficient.</p>
+            <p>
+                All the differences concern only the interface. The core is completely identical, i.e. all the functionality is identical, not related to the appearance and interaction with the user.
+                And both lines of versions are compiled simultaneously from the same code base during releases.
+            </p>
+        </dd>
+
     </dl>
-    <hr />
-    <p>Authors: Zhdanovskih Sergey Vladimirovich, Tarasova Oksana Vladimirovna.</p>
 
 </body>
 </html>

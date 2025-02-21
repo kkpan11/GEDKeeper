@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -21,10 +21,11 @@
 using System;
 using GDModel;
 using GDModel.Providers.GEDCOM;
-using GKCore.Design.Controls;
 using GKCore.Design;
+using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -98,7 +99,7 @@ namespace GKCore.Controllers
             }
         }
 
-        public void ChangeLanguage()
+        public async void ChangeLanguage()
         {
             if (AppHost.Instance.HasFeatureSupport(Feature.Mobile))
                 return;
@@ -106,7 +107,7 @@ namespace GKCore.Controllers
             using (var dlg = AppHost.ResolveDialog<ILanguageEditDlg>()) {
                 dlg.LanguageID = fBase.Context.Tree.Header.Language;
 
-                if (dlg.ShowModalX(fView)) {
+                if (await AppHost.Instance.ShowModalAsync(dlg, fView)) {
                     // Assignment in control, instead of the header's property to work Cancel.
                     fView.Language.Text = GEDCOMUtils.GetLanguageStr(dlg.LanguageID);
                 }
@@ -120,14 +121,23 @@ namespace GKCore.Controllers
             GetControl<IButton>("btnAccept").Text = LangMan.LS(LSID.DlgAccept);
             GetControl<IButton>("btnCancel").Text = LangMan.LS(LSID.DlgCancel);
             GetControl<ITabPage>("pageAuthor").Text = LangMan.LS(LSID.Author);
-            GetControl<ILabel>("lblName").Text = LangMan.LS(LSID.Name);
+            GetControl<ILabel>("lblName").Text = LangMan.LS(LSID.GeneralName);
             GetControl<ILabel>("lblAddress").Text = LangMan.LS(LSID.Address);
             GetControl<ILabel>("lblTelephone").Text = LangMan.LS(LSID.Telephone);
             GetControl<ITabPage>("pageOther").Text = LangMan.LS(LSID.Other);
             GetControl<ILabel>("lblLanguage").Text = LangMan.LS(LSID.Language);
 
+            fView.RecordStats.ClearColumns();
             fView.RecordStats.AddColumn(LangMan.LS(LSID.RM_Records), 300, false);
-            fView.RecordStats.AddColumn("Count", 100, false /*, HorizontalAlignment.Right*/);
+            fView.RecordStats.AddColumn(LangMan.LS(LSID.Count), 100, false, BSDTypes.HorizontalAlignment.Right);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

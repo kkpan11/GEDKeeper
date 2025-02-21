@@ -2,7 +2,7 @@
   <!-- Common -->
   <PropertyGroup>
     <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
-    <LangVersion>5</LangVersion>
+    <LangVersion>7.3</LangVersion>
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
     <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
@@ -37,11 +37,6 @@
     <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
     <BaseIntermediateOutputPath>obj\</BaseIntermediateOutputPath>
     <DefineConstants>$(DefineConstants);TRACE</DefineConstants>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" $(Configuration.Contains('Debug')) ">
-  </PropertyGroup>
-  <PropertyGroup Condition=" $(Configuration.Contains('Release')) ">
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(TargetFrameworkVersion)' == 'v4.0' ">

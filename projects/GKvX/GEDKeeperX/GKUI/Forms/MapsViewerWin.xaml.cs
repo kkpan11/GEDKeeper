@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,15 +19,15 @@
  */
 
 using System;
-using System.Globalization;
+using System.Collections.Generic;
 using GDModel;
 using GKCore;
 using GKCore.Controllers;
 using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Interfaces;
+using GKCore.Maps;
 using GKMap;
-using GKMap.MapObjects;
 using GKMap.MapProviders;
 using GKMap.Xamarin;
 using GKUI.Components;
@@ -106,7 +106,7 @@ namespace GKUI.Forms
             fController = new MapsViewerWinController(this, baseWin.GetContentList(GDMRecordType.rtIndividual));
             fController.Init(baseWin);
 
-            if (!GMapControl.IsDesignerHosted) {
+            {
                 fMapBrowser.MapControl.OnMapTypeChanged += MainMap_OnMapTypeChanged;
                 fMapBrowser.MapControl.OnMapZoomChanged += MainMap_OnMapZoomChanged;
 
@@ -117,11 +117,12 @@ namespace GKUI.Forms
                 if (fMapBrowser.MapControl.Zoom >= fMapBrowser.MapControl.MinZoom && fMapBrowser.MapControl.Zoom <= fMapBrowser.MapControl.MaxZoom) {
                     trkZoom.Value = fMapBrowser.MapControl.Zoom * 100;
                 }
-
-                // get position
-                txtLat.Text = fMapBrowser.MapControl.Position.Lat.ToString(CultureInfo.InvariantCulture);
-                txtLng.Text = fMapBrowser.MapControl.Position.Lng.ToString(CultureInfo.InvariantCulture);
             }
+        }
+
+        public void ShowFixedPoints(IEnumerable<GeoPoint> points)
+        {
+            fController.ShowFixedPoints(points);
         }
 
         private void radTotal_Click(object sender, EventArgs e)
@@ -167,7 +168,7 @@ namespace GKUI.Forms
 
         public ITVNode FindTreeNode(string place)
         {
-            /*GKTreeNode rootNode = fController.TreeRoot as GKTreeNode;
+            GKTreeNode rootNode = fController.TreeRoot as GKTreeNode;
 
             int num = rootNode.Children.Count;
             for (int i = 0; i < num; i++) {
@@ -176,7 +177,7 @@ namespace GKUI.Forms
                 if (node != null && node.Text == place) {
                     return node;
                 }
-            }*/
+            }
 
             return null;
         }
@@ -198,25 +199,11 @@ namespace GKUI.Forms
 
         private void btnSearch_Click(object sender, EventArgs e)
         {
-            try {
-                double lat = double.Parse(txtLat.Text, CultureInfo.InvariantCulture);
-                double lng = double.Parse(txtLng.Text, CultureInfo.InvariantCulture);
-
-                fMapBrowser.MapControl.Position = new PointLatLng(lat, lng);
-            } catch (Exception ex) {
-                AppHost.StdDialogs.ShowError("incorrect coordinate format: " + ex.Message);
+            GeocoderStatusCode status = fMapBrowser.MapControl.SetPositionByKeywords(txtPlace.Text);
+            if (status != GeocoderStatusCode.Success) {
+                AppHost.StdDialogs.ShowError("Geocoder can't find: '" + txtPlace.Text + "', reason: " + status);
             }
         }
-
-        /*private void txtPlace_KeyPress(object sender, KeyEventArgs e)
-        {
-            if ((Keys)e.KeyChar == Keys.Enter) {
-                GeocoderStatusCode status = fMapBrowser.MapControl.SetPositionByKeywords(txtPlace.Text);
-                if (status != GeocoderStatusCode.Success) {
-                    AppHost.StdDialogs.ShowError("Geocoder can't find: '" + txtPlace.Text + "', reason: " + status);
-                }
-            }
-        }*/
 
         private void MainMap_OnMapTypeChanged(GMapProvider type)
         {
@@ -244,18 +231,6 @@ namespace GKUI.Forms
         private void btnZoomDown_Click(object sender, EventArgs e)
         {
             fMapBrowser.MapControl.Zoom = ((int)(fMapBrowser.MapControl.Zoom + 0.99)) - 1;
-        }
-
-        private void btnAddRouteMarker_Click(object sender, EventArgs e)
-        {
-            fMapBrowser.AddMarker(fMapBrowser.TargetPosition, GMarkerIconType.blue_small, MarkerTooltipMode.OnMouseOver, "");
-            fMapBrowser.GenerateRoute();
-        }
-
-        private void btnAddPolygonMarker_Click(object sender, EventArgs e)
-        {
-            fMapBrowser.AddMarker(fMapBrowser.TargetPosition, GMarkerIconType.purple_small, MarkerTooltipMode.OnMouseOver, "");
-            fMapBrowser.GeneratePolygon();
         }
     }
 }

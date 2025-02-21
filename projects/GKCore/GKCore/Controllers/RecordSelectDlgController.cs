@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,7 @@ using GKCore.Design.Views;
 using GKCore.Lists;
 using GKCore.Options;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -58,14 +59,42 @@ namespace GKCore.Controllers
             fTarget = new Target();
         }
 
+        public void ShowDetails()
+        {
+            GDMRecord rec = fView.RecordsList.GetSelectedData() as GDMRecord;
+            if (rec == null) return;
+
+            BaseController.ViewRecordInfo(fView, fBase, rec);
+        }
+
         private void UpdateFilters()
         {
-            var filters = GlobalOptions.Instance.GetRSFilters(fRecType);
-            filters.Sort();
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
+                var filters = GlobalOptions.Instance.GetRSFilters(fRecType);
+                filters.Sort();
 
-            fView.FilterBox.Clear();
-            fView.FilterBox.Add("*");
-            fView.FilterBox.AddStrings(filters);
+                fView.FilterCombo.Clear();
+                fView.FilterCombo.Add("*");
+                fView.FilterCombo.AddStrings(filters);
+            }
+        }
+
+        private string GetFilter()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
+                return fView.FilterCombo.Text;
+            } else {
+                return fView.FilterText.Text;
+            }
+        }
+
+        private void SetFilter(string value)
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
+                fView.FilterCombo.Text = value;
+            } else {
+                fView.FilterText.Text = value;
+            }
         }
 
         public void SetTarget(TargetMode mode, GDMIndividualRecord target, GDMSex needSex, string defFilter = "*")
@@ -81,7 +110,7 @@ namespace GKCore.Controllers
                 }
             }
 
-            fView.FilterBox.Text = defFilter;
+            SetFilter(defFilter);
 
             UpdateView();
         }
@@ -116,14 +145,14 @@ namespace GKCore.Controllers
 
         public void ChangeFilter()
         {
-            string flt = fView.FilterBox.Text;
+            string flt = GetFilter();
             GKUtils.SaveFilter(flt, GlobalOptions.Instance.GetRSFilters(fRecType));
             UpdateFilters();
         }
 
         public override void UpdateView()
         {
-            string flt = fView.FilterBox.Text;
+            string flt = GetFilter();
             if (string.IsNullOrEmpty(flt)) {
                 flt = "*";
             } else if (flt != "*") {
@@ -169,6 +198,13 @@ namespace GKCore.Controllers
             }
 
             recordsList.UpdateContents();
+
+            UpdateButtons();
+        }
+
+        private void UpdateButtons()
+        {
+            GetControl<IButton>("btnSelect").Enabled = fView.RecordsList.ListMan.FilteredCount > 0;
         }
 
         public override void SetLocale()
@@ -180,6 +216,14 @@ namespace GKCore.Controllers
             GetControl<IButton>("btnCancel").Text = LangMan.LS(LSID.DlgCancel);
 
             SetToolTip("txtFastFilter", LangMan.LS(LSID.PressEnterToSaveFilter));
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

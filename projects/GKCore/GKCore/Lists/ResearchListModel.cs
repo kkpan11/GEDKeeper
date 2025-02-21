@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,13 +18,14 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
 using GKCore.Controllers;
 using GKCore.Design;
 using GKCore.Interfaces;
 using GKCore.Operations;
+using GKCore.Options;
 using GKCore.Types;
 
 namespace GKCore.Lists
@@ -48,13 +49,13 @@ namespace GKCore.Lists
 
 
         public ResearchListModel(IBaseContext baseContext) :
-            base(baseContext, CreateResearchListColumns(), GDMRecordType.rtResearch)
+            base(baseContext, CreateListColumns(), GDMRecordType.rtResearch)
         {
         }
 
-        public static ListColumns<GDMResearchRecord> CreateResearchListColumns()
+        public static ListColumns CreateListColumns()
         {
-            var result = new ListColumns<GDMResearchRecord>();
+            var result = new ListColumns(GKListType.rtResearch);
 
             result.AddColumn(LSID.NumberSym, DataType.dtInteger, 50, true);
             result.AddColumn(LSID.Title, DataType.dtString, 300, true, true);
@@ -126,16 +127,23 @@ namespace GKCore.Lists
     {
         private GDMTaskRecord fTaskRec;
 
-        public ResTasksListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        public ResTasksListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete, RecordAction.raJump);
+        }
 
-            fListColumns.AddColumn(LSID.Goal, 250, false);
-            fListColumns.AddColumn(LSID.Priority, 90, false);
-            fListColumns.AddColumn(LSID.StartDate, 90, false);
-            fListColumns.AddColumn(LSID.StopDate, 90, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stResearchTasks);
+
+            result.AddColumn(LSID.Goal, 250, false);
+            result.AddColumn(LSID.Priority, 90, false);
+            result.AddColumn(LSID.StartDate, 90, false);
+            result.AddColumn(LSID.StopDate, 90, false);
+
+            result.ResetDefaults();
+            return result;
         }
 
         public override void Fetch(GDMPointer aRec)
@@ -167,16 +175,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var research = fDataOwner as GDMResearchRecord;
-            if (research == null) return;
-
-            try {
+            if (research != null)
                 UpdateStructList(research.Tasks);
-            } catch (Exception ex) {
-                Logger.WriteError("ResTasksListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var research = fDataOwner as GDMResearchRecord;
             if (fBaseWin == null || research == null) return;
@@ -187,18 +190,21 @@ namespace GKCore.Lists
 
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                    task = fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtTask, null) as GDMTaskRecord;
+                    task = await fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtTask, null) as GDMTaskRecord;
                     if (task != null) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otResearchTaskAdd, research, task);
                     }
                     break;
 
                 case RecordAction.raEdit:
-                    result = (task != null && BaseController.ModifyTask(fOwner, fBaseWin, ref task));
+                    if (task != null) {
+                        var taskRes = await BaseController.ModifyTask(fOwner, fBaseWin, task);
+                        result = taskRes.Result;
+                    }
                     break;
 
                 case RecordAction.raDelete:
-                    if (task != null && AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachTaskQuery))) {
+                    if (task != null && await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachTaskQuery))) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otResearchTaskRemove, research, task);
                     }
                     break;
@@ -219,16 +225,23 @@ namespace GKCore.Lists
     {
         private GDMCommunicationRecord fCommRec;
 
-        public ResCommunicationsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        public ResCommunicationsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete, RecordAction.raJump);
+        }
 
-            fListColumns.AddColumn(LSID.Theme, 150, false);
-            fListColumns.AddColumn(LSID.Corresponder, 150, false);
-            fListColumns.AddColumn(LSID.Type, 90, false);
-            fListColumns.AddColumn(LSID.Date, 90, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stResearchCommunications);
+
+            result.AddColumn(LSID.Theme, 150, false);
+            result.AddColumn(LSID.Corresponder, 150, false);
+            result.AddColumn(LSID.Type, 90, false);
+            result.AddColumn(LSID.Date, 90, false);
+
+            result.ResetDefaults();
+            return result;
         }
 
         public override void Fetch(GDMPointer aRec)
@@ -260,16 +273,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var research = fDataOwner as GDMResearchRecord;
-            if (research == null) return;
-
-            try {
+            if (research != null)
                 UpdateStructList(research.Communications);
-            } catch (Exception ex) {
-                Logger.WriteError("ResCommunicationsListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var research = fDataOwner as GDMResearchRecord;
             if (fBaseWin == null || research == null) return;
@@ -280,18 +288,21 @@ namespace GKCore.Lists
 
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                    comm = fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtCommunication, null) as GDMCommunicationRecord;
+                    comm = await fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtCommunication, null) as GDMCommunicationRecord;
                     if (comm != null) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otResearchCommunicationAdd, research, comm);
                     }
                     break;
 
                 case RecordAction.raEdit:
-                    result = (comm != null && BaseController.ModifyCommunication(fOwner, fBaseWin, ref comm));
+                    if (comm != null) {
+                        var commRes = await BaseController.ModifyCommunication(fOwner, fBaseWin, comm);
+                        result = commRes.Result;
+                    }
                     break;
 
                 case RecordAction.raDelete:
-                    if (comm != null && AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachCommunicationQuery))) {
+                    if (comm != null && await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachCommunicationQuery))) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otResearchCommunicationRemove, research, comm);
                     }
                     break;
@@ -312,13 +323,20 @@ namespace GKCore.Lists
     {
         private GDMGroupRecord fGroupRec;
 
-        public ResGroupsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman)
+        public ResGroupsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete, RecordAction.raJump);
+        }
 
-            fListColumns.AddColumn(LSID.Group, 350, false);
-            fListColumns.ResetDefaults();
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stResearchGroups);
+
+            result.AddColumn(LSID.Group, 350, false);
+
+            result.ResetDefaults();
+            return result;
         }
 
         public override void Fetch(GDMPointer aRec)
@@ -341,16 +359,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var research = fDataOwner as GDMResearchRecord;
-            if (research == null) return;
-
-            try {
+            if (research != null)
                 UpdateStructList(research.Groups);
-            } catch (Exception ex) {
-                Logger.WriteError("ResGroupsListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             var research = fDataOwner as GDMResearchRecord;
             if (fBaseWin == null || research == null) return;
@@ -361,14 +374,14 @@ namespace GKCore.Lists
 
             switch (eArgs.Action) {
                 case RecordAction.raAdd:
-                    group = fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtGroup, null) as GDMGroupRecord;
+                    group = await fBaseWin.Context.SelectRecord(fOwner, GDMRecordType.rtGroup, null) as GDMGroupRecord;
                     if (group != null) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otResearchGroupAdd, research, group);
                     }
                     break;
 
                 case RecordAction.raDelete:
-                    if (group != null && AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachGroupQuery))) {
+                    if (group != null && await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.DetachGroupQuery))) {
                         result = fUndoman.DoOrdinaryOperation(OperationType.otResearchGroupRemove, research, group);
                     }
                     break;

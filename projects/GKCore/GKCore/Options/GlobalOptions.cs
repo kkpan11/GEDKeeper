@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -42,7 +42,7 @@ namespace GKCore.Options
     /// </summary>
     public sealed class GlobalOptions : BaseObject, IOptions
     {
-        public const int OPTS_VERSION = 2;
+        public const int OPTS_VERSION = 3;
 
         private static GlobalOptions fInstance = null;
 
@@ -50,7 +50,6 @@ namespace GKCore.Options
         private readonly StringList fEventFilters;
         private readonly StringList fFARPatterns;
         private readonly StringList fFARReplacements;
-        private readonly IListColumns fIndividualListColumns;
         private readonly List<LangRecord> fLanguages;
         private readonly StringList fLastBases;
         private readonly ListOptionsCollection fListOptions;
@@ -117,6 +116,8 @@ namespace GKCore.Options
 
         public bool DialogClosingWarn { get; set; }
 
+        public bool DisplayFullFileName { get; set; }
+
         public bool EmbeddedMediaPlayer { get; set; }
 
         public StringList EventFilters
@@ -125,6 +126,10 @@ namespace GKCore.Options
         }
 
         public bool ExtendedKinships { get; set; }
+
+        public bool ExtendedLocations { get; set; }
+
+        public bool EL_AbbreviatedNames { get; set; }
 
         public StringList FARPatterns
         {
@@ -147,11 +152,6 @@ namespace GKCore.Options
         public string Geocoder { get; set; }
 
         public string GeoSearchCountry { get; set; }
-
-        public IListColumns IndividualListColumns
-        {
-            get { return fIndividualListColumns; }
-        }
 
         public int InterfaceLang { get; set; }
 
@@ -190,7 +190,9 @@ namespace GKCore.Options
 
         public bool LoadRecentFiles { get; set; }
 
-        public bool MaximizeChartWindows { get; set; }
+        public ChartWindowsShowMode ChartWindowsShowMode { get; set; }
+
+        public MatchPatternMethod MatchPatternMethod { get; set; }
 
         public MediaStoreType MediaStoreDefault { get; set; }
 
@@ -243,7 +245,10 @@ namespace GKCore.Options
         }
 
         /// <summary>
-        /// Hidden option for non-standard order.
+        /// Initial implementation (now just default) for enumerating ATDs: from largest to smallest.
+        /// Reverse order of places: from smallest to largest.
+        ///
+        /// This option affects the display of places in trees and in event editing dialogs.
         /// </summary>
         public bool ReversePlaceEntitiesOrder { get; set; }
 
@@ -251,11 +256,28 @@ namespace GKCore.Options
 
         public bool SearchAndFilterByAllNames { get; set; }
 
+        /// <summary>
+        /// Maps.
+        /// </summary>
+        public bool SearchPlacesWithoutCoords { get; set; }
+
         public bool ShortKinshipForm { get; set; }
 
         public bool ShowDatesCalendar { get; set; }
 
         public bool ShowDatesSign { get; set; }
+
+        /// <summary>
+        /// Hidden option.
+        /// </summary>
+        public bool ShowIndiAssociations { get; set; }
+
+        /// <summary>
+        /// Hidden option.
+        /// </summary>
+        public bool ShowIndiNamesakes { get; set; }
+
+        public bool ShowNumberOfSubstructures { get; set; }
 
         public bool ShowTips { get; set; }
 
@@ -270,6 +292,8 @@ namespace GKCore.Options
             get { return fTreeChartOptions; }
         }
 
+        public bool UnrestrictedExtendedSurnames { get; set; }
+
         public bool UseExtendedNotes { get; set; }
 
         public bool UseSurnamesInPersonSelectionFilter { get; set; }
@@ -277,6 +301,8 @@ namespace GKCore.Options
         public bool UseBirthDatesInPersonSelectionFilter { get; set; }
 
         public WomanSurnameFormat WomanSurnameFormat { get; set; }
+
+        public bool SimpleSingleSurnames { get; set; }
 
 
         private GlobalOptions()
@@ -290,8 +316,6 @@ namespace GKCore.Options
             fProxy = new ProxyOptions();
             fRelations = new StringList();
             fCircleChartOptions = new CircleChartOptions();
-            fIndividualListColumns = IndividualListModel.CreateIndividualListColumns();
-            fIndividualListColumns.ResetDefaults();
             fLanguages = new List<LangRecord>();
             fLastBases = new StringList();
             fListOptions = new ListOptionsCollection();
@@ -335,13 +359,14 @@ namespace GKCore.Options
             FileBackupEachRevisionMaxCount = 0;
 
             ShowTips = true;
-            LoadRecentFiles = true;
+            LoadRecentFiles = false;
             AutoCheckUpdates = true;
             CharsetDetection = false;
             DialogClosingWarn = false;
             Geocoder = "Google";
             GeoSearchCountry = string.Empty;
             CertaintyAlgorithm = CertaintyAlgorithm.WeightedAverage;
+            DisplayFullFileName = false;
 
             Theme = string.Empty;
 
@@ -383,22 +408,36 @@ namespace GKCore.Options
             ShortKinshipForm = false;
             SurnameFirstInOrder = true;
             SurnameInCapitals = false;
-            WomanSurnameFormat = WomanSurnameFormat.wsfNotExtend;
             UseSurnamesInPersonSelectionFilter = false;
             UseBirthDatesInPersonSelectionFilter = false;
+            ShowIndiAssociations = false;
+            ShowIndiNamesakes = true;
+            MatchPatternMethod = MatchPatternMethod.RegEx;
+
+            WomanSurnameFormat = WomanSurnameFormat.wsfNotExtend;
+            SimpleSingleSurnames = false;
+            UnrestrictedExtendedSurnames = false;
         }
 
         public void ResetDefaults_Specials()
         {
             UseExtendedNotes = false;
             KeepRichNames = true;
-            MaximizeChartWindows = false;
+            ChartWindowsShowMode = ChartWindowsShowMode.Default;
             SearchAndFilterByAllNames = false;
             FilesOverwriteWarn = true;
 
             InfoPansOverallSize = -1;
             KeepInfoPansOverallSize = false;
             ExtendedKinships = false;
+
+            ExtendedLocations = false;
+            EL_AbbreviatedNames = true;
+
+            ShowNumberOfSubstructures = false;
+
+            // maps?
+            SearchPlacesWithoutCoords = false;
         }
 
         public void Assign(IOptions source)
@@ -479,6 +518,8 @@ namespace GKCore.Options
             }
 
             InterfaceLang = (ushort)langCode;
+
+            LocaleOptions.Instance.SetLocale((ushort)langCode);
         }
 
         public LangRecord GetLangByCode(int code)
@@ -513,11 +554,20 @@ namespace GKCore.Options
 
         #region MRU
 
+        private static bool EqualsFileNames(string mruFileName, string fileName)
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
+                return mruFileName == fileName;
+            } else {
+                return Path.GetFileName(mruFileName) == Path.GetFileName(fileName);
+            }
+        }
+
         public int MRUFiles_IndexOf(string fileName)
         {
             int num = fMRUFiles.Count;
             for (int i = 0; i < num; i++) {
-                if (fMRUFiles[i].FileName == fileName) {
+                if (EqualsFileNames(fMRUFiles[i].FileName, fileName)) {
                     return i;
                 }
             }
@@ -541,6 +591,18 @@ namespace GKCore.Options
                         mruFiles.Add(mf);
                     } else {
                         MRUFile.DeleteKeys(ini, sect);
+                    }
+                }
+
+                // remove duplicates (only for Mobile)
+                if (AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
+                    for (int i = 0; i < cnt; i++) {
+                        for (int k = cnt - 1; k > i; k--) {
+                            if (EqualsFileNames(mruFiles[i].FileName, mruFiles[k].FileName)) {
+                                mruFiles.RemoveAt(k);
+                                cnt--;
+                            }
+                        }
                     }
                 }
             } catch (Exception ex) {
@@ -636,6 +698,14 @@ namespace GKCore.Options
 
         #endregion
 
+        #region Features
+
+        public bool CanExtendedSurname(GDMSex selectedSex)
+        {
+            bool result = (WomanSurnameFormat != WomanSurnameFormat.wsfNotExtend) && (UnrestrictedExtendedSurnames || (selectedSex == GDMSex.svFemale));
+            return result;
+        }
+
         #region Record Select Dialog Filters
 
         public StringList GetRSFilters(GDMRecordType rt)
@@ -682,6 +752,8 @@ namespace GKCore.Options
 
         #endregion
 
+        #endregion
+
         public void LoadFromFile(IniFile ini)
         {
             if (ini == null)
@@ -700,7 +772,7 @@ namespace GKCore.Options
             ShowDatesCalendar = ini.ReadBool("Common", "ShowDatesCalendar", false);
             ShowDatesSign = ini.ReadBool("Common", "ShowDatesSigns", false);
             RemovableMediaWarning = ini.ReadBool("Common", "RemovableMediaWarning", true);
-            LoadRecentFiles = ini.ReadBool("Common", "LoadRecentFiles", true);
+            LoadRecentFiles = ini.ReadBool("Common", "LoadRecentFiles", false);
             EmbeddedMediaPlayer = ini.ReadBool("Common", "EmbeddedMediaPlayer", true);
             AllowMediaStoreReferences = ini.ReadBool("Common", "AllowMediaStoreReferences", false);
             AllowMediaStoreRelativeReferences = ini.ReadBool("Common", "AllowMediaStoreRelativeReferences", true); // only when AllowMediaStoreReferences is true
@@ -718,11 +790,14 @@ namespace GKCore.Options
             SurnameFirstInOrder = ini.ReadBool("Common", "SurnameFirstInOrder", true);
             SurnameInCapitals = ini.ReadBool("Common", "SurnameInCapitals", false);
             UseExtendedNotes = ini.ReadBool("Common", "UseExtendedNotes", false);
+            DisplayFullFileName = ini.ReadBool("Common", "DisplayFullFileName", false);
 
             Autosave = ini.ReadBool("Common", "Autosave", false);
             AutosaveInterval = ini.ReadInteger("Common", "AutosaveInterval", 10);
 
             WomanSurnameFormat = (WomanSurnameFormat)ini.ReadInteger("Common", "WomanSurnameFormat", 0);
+            SimpleSingleSurnames = ini.ReadBool("Common", "SimpleSingleSurnames", false);
+            UnrestrictedExtendedSurnames = ini.ReadBool("Common", "UnrestrictedExtendedSurnames", false);
 
             Geocoder = ini.ReadString("Common", "Geocoder", "Google");
             GeoSearchCountry = ini.ReadString("Common", "GeoSearchCountry", "");
@@ -746,7 +821,9 @@ namespace GKCore.Options
 
             LoadStringList(ini, fRelations, "Relations", "Relation_");
 
-            fIndividualListColumns.LoadFromFile(ini, "PersonsColumns", optsVersion);
+            if (optsVersion <= 2) {
+                fListOptions[GDMRecordType.rtIndividual].Columns.LoadFromFile(ini, "PersonsColumns", optsVersion);
+            }
 
             ListHighlightUnmarriedPersons = ini.ReadBool("ListPersons", "HighlightUnmarried", false);
             ListHighlightUnparentedPersons = ini.ReadBool("ListPersons", "HighlightUnparented", false);
@@ -761,12 +838,12 @@ namespace GKCore.Options
 
             fCircleChartOptions.LoadFromFile(ini);
 
-            fListOptions.LoadFromFile(ini);
+            fListOptions.LoadFromFile(ini, optsVersion);
 
             ReversePlaceEntitiesOrder = ini.ReadBool("Common", "ReversePlaceEntitiesOrder", false);
             CertaintyAlgorithm = (CertaintyAlgorithm)ini.ReadInteger("Common", "CertaintyAlgorithm", 0);
             LocalizedCalendarSignatures = ini.ReadBool("Common", "LocalizedCalendarSignatures", false);
-            MaximizeChartWindows = ini.ReadBool("Common", "MaximizeChartWindows", false);
+            ChartWindowsShowMode = (ChartWindowsShowMode)ini.ReadInteger("Common", "ChartWindowsShowMode", 0);
             HighlightInaccessibleFiles = ini.ReadBool("Common", "HighlightInaccessibleFiles", false);
 
             LoadStringList(ini, fFARPatterns, "FARPatterns");
@@ -785,9 +862,16 @@ namespace GKCore.Options
             KeepInfoPansOverallSize = ini.ReadBool("Common", "KeepInfoPansOverallSize", false);
             FilesOverwriteWarn = ini.ReadBool("Common", "FilesOverwriteWarn", true);
             ExtendedKinships = ini.ReadBool("Common", "ExtendedKinships", false);
+            ExtendedLocations = ini.ReadBool("Common", "ExtendedLocations", false);
+            EL_AbbreviatedNames = ini.ReadBool("Common", "EL_AbbreviatedNames", true);
 
             UseSurnamesInPersonSelectionFilter = ini.ReadBool("Common", "UseSurnamesInPersonSelectionFilter", false);
             UseBirthDatesInPersonSelectionFilter = ini.ReadBool("Common", "UseBirthDatesInPersonSelectionFilter", false);
+            ShowIndiAssociations = ini.ReadBool("Common", "ShowIndiAssociations", false);
+            ShowIndiNamesakes = ini.ReadBool("Common", "ShowIndiNamesakes", false);
+            ShowNumberOfSubstructures = ini.ReadBool("Common", "ShowNumberOfSubstructures", false);
+            MatchPatternMethod = (MatchPatternMethod)ini.ReadInteger("Common", "MatchPatternMethod", 0);
+            SearchPlacesWithoutCoords = ini.ReadBool("Common", "SearchPlacesWithoutCoords", false);
 
             Theme = ini.ReadString("Common", "Theme", "");
 
@@ -847,6 +931,7 @@ namespace GKCore.Options
             ini.WriteBool("Common", "SurnameFirstInOrder", SurnameFirstInOrder);
             ini.WriteBool("Common", "SurnameInCapitals", SurnameInCapitals);
             ini.WriteBool("Common", "UseExtendedNotes", UseExtendedNotes);
+            ini.WriteBool("Common", "DisplayFullFileName", DisplayFullFileName);
 
             ini.WriteInteger("Common", "KeyLayout", AppHost.Instance.GetKeyLayout());
 
@@ -854,6 +939,8 @@ namespace GKCore.Options
             ini.WriteInteger("Common", "AutosaveInterval", AutosaveInterval);
 
             ini.WriteInteger("Common", "WomanSurnameFormat", (int)WomanSurnameFormat);
+            ini.WriteBool("Common", "SimpleSingleSurnames", SimpleSingleSurnames);
+            ini.WriteBool("Common", "UnrestrictedExtendedSurnames", UnrestrictedExtendedSurnames);
 
             ini.WriteString("Common", "Geocoder", Geocoder);
             ini.WriteString("Common", "GeoSearchCountry", GeoSearchCountry);
@@ -880,7 +967,8 @@ namespace GKCore.Options
 
             SaveStringList(ini, fRelations, "Relations", "Relation_");
 
-            fIndividualListColumns.SaveToFile(ini, "PersonsColumns");
+            // obsolete at OPTS_VERSION = 3
+            //fIndividualListColumns.SaveToFile(ini, "PersonsColumns", OPTS_VERSION);
 
             ini.WriteBool("ListPersons", "HighlightUnmarried", ListHighlightUnmarriedPersons);
             ini.WriteBool("ListPersons", "HighlightUnparented", ListHighlightUnparentedPersons);
@@ -906,12 +994,12 @@ namespace GKCore.Options
 
             fCircleChartOptions.SaveToFile(ini);
 
-            fListOptions.SaveToFile(ini);
+            fListOptions.SaveToFile(ini, OPTS_VERSION);
 
             ini.WriteBool("Common", "ReversePlaceEntitiesOrder", ReversePlaceEntitiesOrder);
             ini.WriteInteger("Common", "CertaintyAlgorithm", (int)CertaintyAlgorithm);
             ini.WriteBool("Common", "LocalizedCalendarSignatures", LocalizedCalendarSignatures);
-            ini.WriteBool("Common", "MaximizeChartWindows", MaximizeChartWindows);
+            ini.WriteInteger("Common", "ChartWindowsShowMode", (int)ChartWindowsShowMode);
             ini.WriteBool("Common", "HighlightInaccessibleFiles", HighlightInaccessibleFiles);
 
             SaveStringList(ini, fFARPatterns, "FARPatterns");
@@ -930,9 +1018,16 @@ namespace GKCore.Options
             ini.WriteBool("Common", "KeepInfoPansOverallSize", KeepInfoPansOverallSize);
             ini.WriteBool("Common", "FilesOverwriteWarn", FilesOverwriteWarn);
             ini.WriteBool("Common", "ExtendedKinships", ExtendedKinships);
+            ini.WriteBool("Common", "ExtendedLocations", ExtendedLocations);
+            ini.WriteBool("Common", "EL_AbbreviatedNames", EL_AbbreviatedNames);
 
             ini.WriteBool("Common", "UseSurnamesInPersonSelectionFilter", UseSurnamesInPersonSelectionFilter);
             ini.WriteBool("Common", "UseBirthDatesInPersonSelectionFilter", UseBirthDatesInPersonSelectionFilter);
+            ini.WriteBool("Common", "ShowIndiAssociations", ShowIndiAssociations);
+            ini.WriteBool("Common", "ShowIndiNamesakes", ShowIndiNamesakes);
+            ini.WriteBool("Common", "ShowNumberOfSubstructures", ShowNumberOfSubstructures);
+            ini.WriteInteger("Common", "MatchPatternMethod", (int)MatchPatternMethod);
+            ini.WriteBool("Common", "SearchPlacesWithoutCoords", SearchPlacesWithoutCoords);
 
             ini.WriteString("Common", "Theme", Theme);
 

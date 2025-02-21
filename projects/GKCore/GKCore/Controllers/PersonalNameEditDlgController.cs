@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -29,6 +29,7 @@ using GKCore.Design.Views;
 using GKCore.Interfaces;
 using GKCore.Options;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -88,9 +89,7 @@ namespace GKCore.Controllers
 
         private bool IsExtendedWomanSurname()
         {
-            bool result = (GlobalOptions.Instance.WomanSurnameFormat != WomanSurnameFormat.wsfNotExtend) &&
-                (fIndividualRecord.Sex == GDMSex.svFemale);
-            return result;
+            return GlobalOptions.Instance.CanExtendedSurname(fIndividualRecord.Sex);
         }
 
         public override void UpdateView()
@@ -164,13 +163,13 @@ namespace GKCore.Controllers
 
         public override void SetLocale()
         {
-            fView.Title = LangMan.LS(LSID.Name);
+            fView.Title = LangMan.LS(LSID.GeneralName);
 
             GetControl<IButton>("btnAccept").Text = LangMan.LS(LSID.DlgAccept);
             GetControl<IButton>("btnCancel").Text = LangMan.LS(LSID.DlgCancel);
             GetControl<ILabel>("lblSurname").Text = LangMan.LS(LSID.Surname);
             GetControl<ILabel>("lblMarriedSurname").Text = LangMan.LS(LSID.MarriedSurname);
-            GetControl<ILabel>("lblName").Text = LangMan.LS(LSID.Name);
+            GetControl<ILabel>("lblName").Text = LangMan.LS(LSID.GivenName);
             GetControl<ILabel>("lblPatronymic").Text = LangMan.LS(LSID.Patronymic);
             GetControl<ILabel>("lblNickname").Text = LangMan.LS(LSID.Nickname);
             GetControl<ILabel>("lblSurnamePrefix").Text = LangMan.LS(LSID.SurnamePrefix);
@@ -178,6 +177,14 @@ namespace GKCore.Controllers
             GetControl<ILabel>("lblNameSuffix").Text = LangMan.LS(LSID.NameSuffix);
             GetControl<ILabel>("lblType").Text = LangMan.LS(LSID.Type);
             GetControl<ILabel>("lblLanguage").Text = LangMan.LS(LSID.Language);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

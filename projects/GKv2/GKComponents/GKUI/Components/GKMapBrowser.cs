@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -104,6 +104,16 @@ namespace GKUI.Components
             return res;
         }
 
+        public int AddPoint(GeoPoint pt)
+        {
+            BeginUpdate();
+            int res = fMapPoints.Count;
+            fMapPoints.Add(pt);
+            EndUpdate();
+
+            return res;
+        }
+
         public void ClearPoints()
         {
             fObjects.Clear();
@@ -183,7 +193,7 @@ namespace GKUI.Components
         private GMapControl fMapControl;
         private MapMarker fTargetMarker;
 
-        public GMapControl MapControl
+        public IMapControl MapControl
         {
             get { return fMapControl; }
         }
@@ -196,14 +206,16 @@ namespace GKUI.Components
         public PointLatLng TargetPosition
         {
             get { return fTargetMarker.Position; }
+            set { fTargetMarker.Position = value; }
         }
 
         private void InitControl()
         {
+            Margin = new Padding(4);
+
             fMapControl = new GMapControl();
             fMapControl.Dock = DockStyle.Fill;
             fMapControl.Location = new Point(0, 0);
-            fMapControl.Margin = new Padding(4);
             fMapControl.MaxZoom = 17;
             fMapControl.MinZoom = 2;
             fMapControl.Zoom = 0;
@@ -249,14 +261,6 @@ namespace GKUI.Components
                 fTargetMarker.IsHitTestVisible = false;
                 fTargetMarker.IsVisible = true;
                 fTopOverlay.Markers.Add(fTargetMarker);
-
-                // add start location
-                GeocoderStatusCode status;
-                PointLatLng? pos = GMapProviders.GoogleMap.GetPoint("Russia, Moscow", out status);
-                if (pos != null && status == GeocoderStatusCode.Success) {
-                    fTargetMarker.Position = pos.Value;
-                    fMapControl.ZoomAndCenterMarkers(null);
-                }
             }
         }
 

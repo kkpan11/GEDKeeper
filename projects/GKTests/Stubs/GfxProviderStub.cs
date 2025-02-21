@@ -32,12 +32,16 @@ namespace GKTests.Stubs
         {
         }
 
+        public void FreeImage(ref IImage image)
+        {
+        }
+
         public Stream CheckOrientation(Stream inputStream)
         {
             return inputStream;
         }
 
-        public IImage LoadImage(Stream stream, int thumbWidth, int thumbHeight, ExtRect cutoutArea)
+        public IImage LoadImage(Stream stream, int thumbWidth, int thumbHeight, ExtRect cutoutArea, string cachedFile)
         {
             return Substitute.For<IImage>();
         }
@@ -52,12 +56,12 @@ namespace GKTests.Stubs
             return Substitute.For<IImage>();
         }
 
-        public IImage LoadResourceImage(Type baseType, string resName)
+        public IImage LoadResourceImage(Type baseType, string resName, ImageTarget target)
         {
             return Substitute.For<IImage>();
         }
 
-        public IImage LoadResourceImage(string resName, bool makeTransp)
+        public IImage LoadResourceImage(string resName, ImageTarget target, bool makeTransp)
         {
             return Substitute.For<IImage>();
         }
@@ -126,6 +130,11 @@ namespace GKTests.Stubs
         public string GetDefaultFontName()
         {
             return null;
+        }
+
+        public float GetDefaultFontSize()
+        {
+            return 8.0f;
         }
     }
 }

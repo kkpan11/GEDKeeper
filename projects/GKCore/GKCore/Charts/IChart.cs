@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2020 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -25,7 +25,7 @@ namespace GKCore.Charts
 	/// <summary>
 	/// 
 	/// </summary>
-    public interface IChart
+    public interface IChart : IScrollableContainer
     {
         IBaseWindow Base { get; set; }
 

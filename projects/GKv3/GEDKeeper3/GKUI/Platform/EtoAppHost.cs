@@ -1,6 +1,6 @@
 /*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -25,6 +25,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using BSLib;
 using Eto.Drawing;
 using Eto.Forms;
@@ -44,6 +45,7 @@ using GKUI.Themes;
 
 namespace GKUI.Platform
 {
+    using CommonDialog = Forms.CommonDialog;
     using FormWindowState = Eto.Forms.WindowState;
 
     /// <summary>
@@ -141,12 +143,12 @@ namespace GKUI.Platform
 
         private void OnApplicationExit(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            //AppHost.Instance.SaveLastBases();
+            ApplicationExit();
         }
 
-        public override void Init(string[] args, bool isMDI)
+        public override async Task Init(string[] args, bool isMDI)
         {
-            base.Init(args, isMDI);
+            await base.Init(args, isMDI);
             Application.Instance.Terminating += OnApplicationExit;
         }
 
@@ -185,20 +187,20 @@ namespace GKUI.Platform
             return IntPtr.Zero;
         }
 
-        public override bool ShowModalX(ICommonDialog dialog, IView owner, bool keepModeless = false)
+        public override async Task<bool> ShowModalAsync(ICommonDialog dialog, IView owner, bool keepModeless = false)
         {
-            //Window activeWin = GetActiveForm() as Window;
-            //Console.WriteLine((owner == null) ? "null" : owner.ToString());
+            var efModal = dialog as CommonDialog;
+            if (efModal == null) return false;
 
+            //Window activeWin = GetActiveForm() as Window;
             /*if (keepModeless) {
 #if OS_MSWIN
                 //NativeMethods.PostMessage(mainHandle, NativeMethods.WM_KEEPMODELESS, IntPtr.Zero, IntPtr.Zero);
 #endif
             }*/
 
-            //UIHelper.CenterFormByParent((Window)form, mainHandle);
-
-            return (dialog != null && dialog.ShowModalX(owner));
+            efModal.ShowModal(owner as Control);
+            return await efModal.DialogResultTask;
         }
 
         public override void EnableWindow(IWidgetForm form, bool value)
@@ -260,7 +262,7 @@ namespace GKUI.Platform
                 try {
                     workerThread.Start(progressForm);
 
-                    progressForm.ShowModalX(activeWnd);
+                    ((Dialog)progressForm).ShowModal(activeWnd as Control);
                 } catch (Exception ex) {
                     Logger.WriteError("ExecuteWork()", ex);
                 }
@@ -287,6 +289,14 @@ namespace GKUI.Platform
             var activeForm = GetActiveWindow() as Form;
             var screen = Screen.FromRectangle(activeForm.Bounds);
             return UIHelper.Rt2Rt(new Rectangle(screen.WorkingArea));
+        }
+
+        public override void SetWindowBounds(IWindow window, ExtRect bounds)
+        {
+            var form = window as Form;
+            if (form == null) return;
+
+            form.Bounds = UIHelper.Rt2Rt(bounds);
         }
 
         public override void WidgetLocate(IWidgetForm view, WidgetLocation location)
@@ -334,11 +344,11 @@ namespace GKUI.Platform
 
                 case Feature.RecentFilesLoad:
                     // In the SDI interface, it is not clear how to implement it correctly
-                    result = false;
+                    result = true;
                     break;
 
                 case Feature.Themes:
-                    result = false; // FIXME: temp disable
+                    result = true;
                     break;
 
                 case Feature.OverwritePrompt:
@@ -509,8 +519,11 @@ namespace GKUI.Platform
             container.Register<ILanguageEditDlg, LanguageEditDlg>(LifeCycle.Transient);
             container.Register<ILanguageSelectDlg, LanguageSelectDlg>(LifeCycle.Transient);
             container.Register<ILocationEditDlg, LocationEditDlg>(LifeCycle.Transient);
+            container.Register<ILocationNameEditDlg, LocationNameEditDlg>(LifeCycle.Transient);
+            container.Register<ILocationLinkEditDlg, LocationLinkEditDlg>(LifeCycle.Transient);
             container.Register<IMapsViewerWin, MapsViewerWin>(LifeCycle.Transient);
             container.Register<IMediaEditDlg, MediaEditDlg>(LifeCycle.Transient);
+            container.Register<IMediaViewerWin, MediaViewerWin>(LifeCycle.Transient);
             container.Register<INameEditDlg, NameEditDlg>(LifeCycle.Transient);
             container.Register<INoteEditDlg, NoteEditDlg>(LifeCycle.Transient);
             container.Register<INoteEditDlgEx, NoteEditDlgEx>(LifeCycle.Transient);
@@ -545,6 +558,11 @@ namespace GKUI.Platform
             container.Register<IUserRefEditDlg, UserRefEditDlg>(LifeCycle.Transient);
             container.Register<IRecordInfoDlg, RecordInfoDlg>(LifeCycle.Transient);
             container.Register<IFARDlg, FindAndReplaceDlg>(LifeCycle.Transient);
+            container.Register<IEventDefEditDlg, EventDefEditDlg>(LifeCycle.Transient);
+            container.Register<ILocExpertDlg, LocExpertDlg>(LifeCycle.Transient);
+            container.Register<IPartialView, PartialView>(LifeCycle.Transient);
+            container.Register<ISourceCallNumberEditDlg, SourceCallNumberEditDlg>(LifeCycle.Transient);
+            container.Register<IRepositoryCitEditDlg, RepositoryCitEditDlg>(LifeCycle.Transient);
 
             container.Register<IProgressDialog, ProgressDlg>(LifeCycle.Transient);
 

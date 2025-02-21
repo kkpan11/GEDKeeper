@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -39,6 +39,7 @@ namespace GKUI.Forms
 
         private Button btnAccept;
         private Button btnCancel;
+        private TabControl tabsData;
         private TabPage pageNotes;
         private TabPage pageMultimedia;
         private TabPage pageCommon;
@@ -56,7 +57,11 @@ namespace GKUI.Forms
         private Button btnShowOnMap;
         private GKMapBrowser fMapBrowser;
         private GKSheetList fMediaList;
+        private GKSheetList fNamesList;
+        private GKSheetList fLinksList;
         private GKSheetList fNotesList;
+        private GroupBox pageHistNames;
+        private GroupBox pageHistLinks;
 
 #pragma warning restore CS0169, CS0649, IDE0044, IDE0051
         #endregion
@@ -72,6 +77,16 @@ namespace GKUI.Forms
         IMapBrowser ILocationEditDlg.MapBrowser
         {
             get { return fMapBrowser; }
+        }
+
+        ISheetList ILocationEditDlg.NamesList
+        {
+            get { return fNamesList; }
+        }
+
+        ISheetList ILocationEditDlg.LinksList
+        {
+            get { return fLinksList; }
         }
 
         ISheetList ILocationEditDlg.MediaList
@@ -110,8 +125,19 @@ namespace GKUI.Forms
         {
             XamlReader.Load(this);
 
+            tabsData.SelectedIndexChanged += tabsData_SelectedIndexChanged;
+
             fController = new LocationEditDlgController(this);
             fController.Init(baseWin);
+        }
+
+        private void tabsData_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var tabCtl = (TabControl)sender;
+            var selectedTab = tabCtl.SelectedIndex;
+            if (selectedTab == 1) {
+                fController.CheckPrimaryName();
+            }
         }
 
         private void EditName_KeyDown(object sender, KeyEventArgs e)
@@ -134,6 +160,11 @@ namespace GKUI.Forms
         private void btnSelectName_Click(object sender, EventArgs e)
         {
             fController.SelectName();
+        }
+
+        private void btnSelectCursor_Click(object sender, EventArgs e)
+        {
+            fController.SelectCursorCoords();
         }
 
         private void ListGeoCoords_Click(object sender, EventArgs e)

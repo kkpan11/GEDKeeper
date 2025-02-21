@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,6 +19,7 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using GDModel;
 using GKCore.Linguistics;
 
@@ -34,15 +35,6 @@ namespace GKCore.Cultures
             // default values
             HasPatronymic = true;
             HasSurname = true;
-        }
-
-        private static string GetMaidenSurname(string surname)
-        {
-            if (string.IsNullOrEmpty(surname)) return "";
-
-            int p = surname.IndexOf(" (");
-            string result = ((p >= 0) ? surname.Substring(0, p) : surname);
-            return result;
         }
 
         public override string NormalizeSurname(string sn, bool aFemale)
@@ -82,15 +74,16 @@ namespace GKCore.Cultures
                 res = husbSurname;
 
                 char lastSym = res[res.Length - 1];
+                var end2 = Morpher.Right(res, 2);
 
-                if (CONSONANTS.IndexOf(lastSym) >= 0) {
-                    if (!res.EndsWith("ких")) {
+                if (!"иа их ых ко ич".Contains(end2)) {
+                    if (CONSONANTS.IndexOf(lastSym) >= 0) {
                         res = res + "а";
+                    } else if (res.EndsWith("кий")) {
+                        res = res.Substring(0, res.Length - 3) + "кая";
+                    } else if (res.EndsWith("ный")) {
+                        res = res.Substring(0, res.Length - 3) + "ная";
                     }
-                } else if (res.EndsWith("кий")) {
-                    res = res.Substring(0, res.Length - 3) + "кая";
-                } else if (res.EndsWith("ный")) {
-                    res = res.Substring(0, res.Length - 3) + "ная";
                 }
             }
 
@@ -105,7 +98,7 @@ namespace GKCore.Cultures
             return str.IndexOf(c) >= 0;
         }
 
-        public override GDMSex GetSex(string iName, string iPat, bool canQuery)
+        public override async Task<GDMSex> GetSex(string iName, string iPat, bool canQuery)
         {
             GDMSex result = GDMSex.svUnknown;
             if (string.IsNullOrEmpty(iName)) return result;
@@ -128,7 +121,7 @@ namespace GKCore.Cultures
 
             if (result == GDMSex.svUnknown && canQuery) {
                 string fn = iName + " " + iPat;
-                bool res = AppHost.StdDialogs.ShowQuestion(string.Format(LangMan.LS(LSID.NotDeterminedPersonSex), fn));
+                bool res = await AppHost.StdDialogs.ShowQuestion(string.Format(LangMan.LS(LSID.NotDeterminedPersonSex), fn));
                 result = res ? GDMSex.svMale : GDMSex.svFemale;
             }
 

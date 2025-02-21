@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -27,6 +27,9 @@ namespace GDModel
 {
     public sealed class GDMDatePeriod : GDMCustomDate
     {
+        public static readonly GDMDatePeriod Empty = new GDMDatePeriod();
+
+
         private readonly GDMDate fDateFrom;
         private readonly GDMDate fDateTo;
 
@@ -58,30 +61,42 @@ namespace GDModel
         protected override string GetStringValue()
         {
             string result;
-            if (!fDateFrom.IsEmpty() && !fDateTo.IsEmpty()) {
-                result = string.Concat("FROM ", fDateFrom.StringValue, " TO ", fDateTo.StringValue);
-            } else if (!fDateFrom.IsEmpty()) {
-                result = "FROM " + fDateFrom.StringValue;
-            } else if (!fDateTo.IsEmpty()) {
+
+            bool frEmpty = fDateFrom.IsEmpty();
+            bool toEmpty = fDateTo.IsEmpty();
+
+            if (!frEmpty) {
+                if (!toEmpty) {
+                    result = string.Concat("FROM ", fDateFrom.StringValue, " TO ", fDateTo.StringValue);
+                } else {
+                    result = "FROM " + fDateFrom.StringValue;
+                }
+            } else if (!toEmpty) {
                 result = "TO " + fDateTo.StringValue;
             } else {
                 result = "";
             }
+
             return result;
         }
 
         public override DateTime GetDateTime()
         {
             DateTime result;
-            if (fDateFrom.IsEmpty()) {
+
+            bool frEmpty = fDateFrom.IsEmpty();
+            bool toEmpty = fDateTo.IsEmpty();
+
+            if (frEmpty) {
                 result = fDateTo.GetDateTime();
-            } else if (fDateTo.IsEmpty()) {
+            } else if (toEmpty) {
                 result = fDateFrom.GetDateTime();
             } else if (fDateFrom.GetDateTime() == fDateTo.GetDateTime()) {
                 result = fDateFrom.GetDateTime();
             } else {
                 result = new DateTime(0);
             }
+
             return result;
         }
 
@@ -123,14 +138,19 @@ namespace GDModel
         {
             UDN result;
 
-            if (fDateFrom.StringValue != "" && fDateTo.StringValue == "") {
-                result = UDN.CreateAfter(fDateFrom.GetUDN());
-            } else if (fDateFrom.StringValue == "" && fDateTo.StringValue != "") {
+            bool frEmpty = fDateFrom.IsEmpty();
+            bool toEmpty = fDateTo.IsEmpty();
+
+            if (!frEmpty) {
+                if (!toEmpty) {
+                    result = UDN.CreateBetween(fDateFrom.GetUDN(), fDateTo.GetUDN(), false);
+                } else {
+                    result = UDN.CreateAfter(fDateFrom.GetUDN());
+                }
+            } else if (!toEmpty) {
                 result = UDN.CreateBefore(fDateTo.GetUDN());
-            } else if (fDateFrom.StringValue != "" && fDateTo.StringValue != "") {
-                result = UDN.CreateBetween(fDateFrom.GetUDN(), fDateTo.GetUDN(), false);
             } else {
-                result = UDN.CreateUnknown();
+                result = UDN.Unknown;
             }
 
             return result;
@@ -138,19 +158,40 @@ namespace GDModel
 
         public override string GetDisplayStringExt(DateFormat format, bool sign, bool showCalendar, bool shorten = false)
         {
-            string result = "";
+            string result;
 
-            if (fDateFrom.StringValue != "" && fDateTo.StringValue == "") {
-                result = fDateFrom.GetDisplayString(format, true, showCalendar);
-                if (sign) result += " >";
-            } else if (fDateFrom.StringValue == "" && fDateTo.StringValue != "") {
+            bool frEmpty = fDateFrom.IsEmpty();
+            bool toEmpty = fDateTo.IsEmpty();
+
+            if (!frEmpty) {
+                if (!toEmpty) {
+                    result = fDateFrom.GetDisplayString(format, true, showCalendar) + " - " + fDateTo.GetDisplayString(format, true, showCalendar);
+                } else {
+                    result = fDateFrom.GetDisplayString(format, true, showCalendar);
+                    if (sign) result += " >";
+                }
+            } else if (!toEmpty) {
                 result = fDateTo.GetDisplayString(format, true, showCalendar);
                 if (sign) result = "< " + result;
-            } else if (fDateFrom.StringValue != "" && fDateTo.StringValue != "") {
-                result = fDateFrom.GetDisplayString(format, true, showCalendar) + " - " + fDateTo.GetDisplayString(format, true, showCalendar);
+            } else {
+                result = "";
             }
 
             return result;
+        }
+
+        public override void GetDateRange(out GDMDate dateStart, out GDMDate dateEnd)
+        {
+            dateStart = fDateFrom;
+            dateEnd = fDateTo;
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fDateFrom);
+            hashCode.Add(fDateTo);
         }
     }
 }

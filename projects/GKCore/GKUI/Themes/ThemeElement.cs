@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -95,6 +95,40 @@ namespace GKUI.Themes
         Glyph_Prev,
         Glyph_Next,
         Glyph_SendMail,
+        Glyph_PartialView,
+
+        Glyph_Accept,
+        Glyph_Cancel,
+
+        Glyph_ItemAdd,
+        Glyph_ItemEdit,
+        Glyph_ItemDelete,
+
+        Glyph_LinkJump,
+        Glyph_MoveUp,
+        Glyph_MoveDown,
+
+        Glyph_Copy,
+        Glyph_Cut,
+        Glyph_Paste,
+
+        Glyph_ImageSave,
+        Glyph_DocPrint,
+        Glyph_DocPreview,
+
+        Glyph_Start,
+        Glyph_Stop,
+
+        Glyph_Undo, // not used yet
+        Glyph_Redo, // not used yet
+
+        Glyph_Attach,
+        Glyph_Detach,
+
+        Glyph_SizeToFit,
+        Glyph_ZoomIn,
+        Glyph_ZoomOut,
+        Glyph_SetPortrait,
     }
 
 

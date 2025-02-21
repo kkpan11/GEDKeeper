@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -24,9 +24,10 @@ using GKCore.Design.Controls;
 using GKCore.Maps;
 using GKCore.Options;
 using GKMap;
-using GKMap.Xamarin;
 using GKMap.MapObjects;
 using GKMap.MapProviders;
+using GKMap.Xamarin;
+using SkiaSharp;
 using Xamarin.Forms;
 
 namespace GKUI.Components
@@ -34,7 +35,7 @@ namespace GKUI.Components
     /// <summary>
     ///
     /// </summary>
-    public class GKMapBrowser : ContentView, IMapBrowser
+    public sealed class GKMapBrowser : ContentView, IMapBrowser
     {
         private readonly List<GeoPoint> fMapPoints;
         private bool fShowPoints;
@@ -90,6 +91,16 @@ namespace GKUI.Components
         {
             BeginUpdate();
             GeoPoint pt = new GeoPoint(latitude, longitude, hint);
+            int res = fMapPoints.Count;
+            fMapPoints.Add(pt);
+            EndUpdate();
+
+            return res;
+        }
+
+        public int AddPoint(GeoPoint pt)
+        {
+            BeginUpdate();
             int res = fMapPoints.Count;
             fMapPoints.Add(pt);
             EndUpdate();
@@ -176,7 +187,7 @@ namespace GKUI.Components
         private GMapControl fMapControl;
         private MapMarker fTargetMarker;
 
-        public GMapControl MapControl
+        public IMapControl MapControl
         {
             get { return fMapControl; }
         }
@@ -189,12 +200,14 @@ namespace GKUI.Components
         public PointLatLng TargetPosition
         {
             get { return fTargetMarker.Position; }
+            set { fTargetMarker.Position = value; }
         }
 
         private void InitControl()
         {
+            Padding = new Thickness(4);
+
             fMapControl = new GMapControl();
-            //fMapControl.Margin = new Padding(4);
             fMapControl.MaxZoom = 17;
             fMapControl.MinZoom = 2;
             fMapControl.Zoom = 0;
@@ -202,7 +215,7 @@ namespace GKUI.Components
             fMapControl.VerticalOptions = LayoutOptions.FillAndExpand;
             Content = fMapControl;
 
-            if (!GMapControl.IsDesignerHosted) {
+            {
                 var proxy = GlobalOptions.Instance.Proxy;
                 if (proxy.UseProxy) {
                     GMapProvider.IsSocksProxy = true;
@@ -225,31 +238,22 @@ namespace GKUI.Components
 
                 // map events
                 fMapControl.OnMapTypeChanged += MainMap_OnMapTypeChanged;
-                /*fMapControl.OnMarkerClick += MainMap_OnMarkerClick;
+                //fMapControl.OnMarkerClick += MainMap_OnMarkerClick;
                 fMapControl.OnMarkerEnter += MainMap_OnMarkerEnter;
                 fMapControl.OnMarkerLeave += MainMap_OnMarkerLeave;
                 fMapControl.OnPolygonEnter += MainMap_OnPolygonEnter;
                 fMapControl.OnPolygonLeave += MainMap_OnPolygonLeave;
                 fMapControl.OnRouteEnter += MainMap_OnRouteEnter;
                 fMapControl.OnRouteLeave += MainMap_OnRouteLeave;
-                fMapControl.MouseMove += MainMap_MouseMove;
-                fMapControl.MouseDown += MainMap_MouseDown;
-                fMapControl.MouseUp += MainMap_MouseUp;
-                fMapControl.KeyUp += MainForm_KeyUp;*/
+                //fMapControl.MouseMove += MainMap_MouseMove;
+                //fMapControl.MouseDown += MainMap_MouseDown;
+                //fMapControl.MouseUp += MainMap_MouseUp;
 
                 // set current marker
                 fTargetMarker = new GMarkerIcon(fMapControl.Position, GMarkerIconType.arrow);
                 fTargetMarker.IsHitTestVisible = false;
                 fTargetMarker.IsVisible = true;
                 fTopOverlay.Markers.Add(fTargetMarker);
-
-                // add start location
-                GeocoderStatusCode status;
-                PointLatLng? pos = GMapProviders.OpenStreetMap.GetPoint("Russia, Moscow", out status);
-                if (pos != null && status == GeocoderStatusCode.Success) {
-                    fTargetMarker.Position = pos.Value;
-                    fMapControl.ZoomAndCenterMarkers(null);
-                }
             }
         }
 
@@ -336,10 +340,86 @@ namespace GKUI.Components
 
         #region Event handlers
 
+        private void MainMap_OnMarkerLeave(MapMarker item)
+        {
+            fCurrentObj = null;
+        }
+
+        private void MainMap_OnMarkerEnter(MapMarker item)
+        {
+            fCurrentObj = item;
+        }
+
+        private void MainMap_OnPolygonLeave(MapPolygon item)
+        {
+            fCurrentObj = null;
+            ((GMapPolygon)item).Stroke.Color = SKColors.MidnightBlue;
+        }
+
+        private void MainMap_OnPolygonEnter(MapPolygon item)
+        {
+            fCurrentObj = item;
+            ((GMapPolygon)item).Stroke.Color = SKColors.Red;
+        }
+
+        private void MainMap_OnRouteLeave(MapRoute item)
+        {
+            fCurrentObj = null;
+            ((GMapRoute)item).Stroke.Color = SKColors.MidnightBlue;
+        }
+
+        private void MainMap_OnRouteEnter(MapRoute item)
+        {
+            fCurrentObj = item;
+            ((GMapRoute)item).Stroke.Color = SKColors.Red;
+        }
+
         private void MainMap_OnMapTypeChanged(GMapProvider type)
         {
             fMapControl.ZoomAndCenterMarkers("objects");
         }
+
+        /*private void MainMap_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Buttons == MouseButtons.Primary) {
+                fIsMouseDown = false;
+            }
+        }*/
+
+        /*private void MainMap_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Buttons == MouseButtons.Primary) {
+                fIsMouseDown = true;
+                if (fTargetMarker.IsVisible) {
+                    Point mpt = e.Location.ToPoint();
+                    fTargetMarker.Position = fMapControl.FromLocalToLatLng(mpt.X, mpt.Y);
+                }
+            }
+        }*/
+
+        /*private void MainMap_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.Buttons == MouseButtons.Primary && fIsMouseDown) {
+                if (fTargetMarker.IsVisible) {
+                    Point mpt = e.Location.ToPoint();
+                    fTargetMarker.Position = fMapControl.FromLocalToLatLng(mpt.X, mpt.Y);
+                }
+
+                fMapControl.Refresh(); // force instant invalidation
+            }
+        }*/
+
+        /*private void MainMap_OnMarkerClick(MapMarker item, MouseEventArgs e)
+        {
+            if (e.Buttons == MouseButtons.Primary) {
+                GeocoderStatusCode status;
+                var pos = GMapProviders.GoogleMap.GetPlacemark(item.Position, out status);
+                if (status == GeocoderStatusCode.Success && pos != null) {
+                    item.ToolTipText = pos.Value.Address;
+                    fMapControl.Invalidate(false);
+                }
+            }
+        }*/
 
         #endregion
 

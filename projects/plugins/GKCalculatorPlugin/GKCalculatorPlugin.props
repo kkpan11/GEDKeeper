@@ -2,6 +2,9 @@
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
     <ItemGroup>
+        <None Include="GKCalculatorPlugin.afr">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKCalculatorPlugin.cze">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
@@ -14,7 +17,13 @@
         <None Include="GKCalculatorPlugin.enu">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Include="GKCalculatorPlugin.fra">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKCalculatorPlugin.hun">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKCalculatorPlugin.jpn">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Include="GKCalculatorPlugin.pol">
@@ -23,7 +32,13 @@
         <None Include="GKCalculatorPlugin.rus">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Include="GKCalculatorPlugin.spa">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Include="GKCalculatorPlugin.ukr">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="GKCalculatorPlugin.zho">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <EmbeddedResource Include="Resources\icon_calc.gif" />

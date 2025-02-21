@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,11 +18,14 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
-using GKCore.Design.Controls;
 using GKCore.Design;
+using GKCore.Design.Controls;
 using GKCore.Design.Views;
+using GKCore.Interfaces;
 using GKCore.Tools;
 using GKCore.Types;
 
@@ -34,6 +37,7 @@ namespace GKCore.Controllers
     public class RecMergeController : DialogController<IRecMergeDlg>
     {
         private bool fBookmark;
+        private List<GDMRecord> fFilteredRecords;
         private GDMRecordType fMergeMode;
         private readonly StringList fRMSkip;
         private int fRMIndex;
@@ -43,10 +47,17 @@ namespace GKCore.Controllers
         public RecMergeController(IRecMergeDlg view) : base(view)
         {
             fRMSkip = new StringList();
-            fMergeMode = GDMRecordType.rtIndividual;
 
             SetRec1(null);
             SetRec2(null);
+        }
+
+        public override void Init(IBaseWindow baseWin)
+        {
+            base.Init(baseWin);
+            if (fBase != null) {
+                SetMergeMode(GDMRecordType.rtIndividual);
+            }
         }
 
         public override void UpdateView()
@@ -60,6 +71,12 @@ namespace GKCore.Controllers
             GDMFamilyRecord fam2 = tree.GetParentsFamily(rec2);
 
             return (!Equals(fam1, fam2));
+        }
+
+        private void SetMergeMode(GDMRecordType value)
+        {
+            fMergeMode = value;
+            fFilteredRecords = fBase.GetContentList(fMergeMode);
         }
 
         public void Skip()
@@ -92,23 +109,17 @@ namespace GKCore.Controllers
             fView.SkipBtn.Enabled = false;
 
             try {
-                var tree = fBase.Context.Tree;
+                int recNum = fFilteredRecords.Count;
 
                 fView.ProgressBar.Minimum = 0;
-                fView.ProgressBar.Maximum = tree.RecordsCount;
+                fView.ProgressBar.Maximum = recNum;
                 fView.ProgressBar.Value = fRMIndex;
 
-                int recNum = tree.RecordsCount;
                 for (int i = fRMIndex; i < recNum; i++) {
-                    fRMIndex = i;
-                    fView.ProgressBar.Increment(1);
-
-                    GDMRecord iRec = tree[i];
-                    if (iRec.RecordType != fMergeMode) continue;
+                    GDMRecord iRec = fFilteredRecords[i];
 
                     for (int j = i + 1; j < recNum; j++) {
-                        GDMRecord kRec = tree[j];
-                        if (kRec.RecordType != fMergeMode) continue;
+                        GDMRecord kRec = fFilteredRecords[j];
 
                         if (iRec == kRec) continue;
                         if (fRMSkip.IndexOf(iRec.XRef + "-" + kRec.XRef) >= 0) continue;
@@ -125,6 +136,9 @@ namespace GKCore.Controllers
                             break;
                         }
                     }
+
+                    fRMIndex = i;
+                    fView.ProgressBar.Increment(1);
 
                     if (res) break;
                 }
@@ -160,12 +174,19 @@ namespace GKCore.Controllers
             GetControl<IButton>("btnEditRight").Text = LangMan.LS(LSID.DoEdit);
         }
 
+        public override void ApplyTheme()
+        {
+            // dummy
+        }
+
         public void ChangeOption()
         {
-            if (GetControl<IRadioButton>("radPersons").Checked) fMergeMode = GDMRecordType.rtIndividual;
-            if (GetControl<IRadioButton>("radNotes").Checked) fMergeMode = GDMRecordType.rtNote;
-            if (GetControl<IRadioButton>("radFamilies").Checked) fMergeMode = GDMRecordType.rtFamily;
-            if (GetControl<IRadioButton>("radSources").Checked) fMergeMode = GDMRecordType.rtSource;
+            var mergeMode = GDMRecordType.rtNone;
+            if (GetControl<IRadioButton>("radPersons").Checked) mergeMode = GDMRecordType.rtIndividual;
+            if (GetControl<IRadioButton>("radNotes").Checked) mergeMode = GDMRecordType.rtNote;
+            if (GetControl<IRadioButton>("radFamilies").Checked) mergeMode = GDMRecordType.rtFamily;
+            if (GetControl<IRadioButton>("radSources").Checked) mergeMode = GDMRecordType.rtSource;
+            SetMergeMode(mergeMode);
 
             fBookmark = GetControl<ICheckBox>("chkBookmarkMerged").Checked;
         }
@@ -191,7 +212,7 @@ namespace GKCore.Controllers
             } else {
                 GetControl<ILabel>("Lab1").Text = fRec1.XRef;
                 GetControl<ITextBox>("Edit1").Text = GKUtils.GetRecordName(fBase.Context.Tree, fRec1, false);
-                fView.View1.Lines.Assign(fBase.GetRecordContent(fRec1));
+                fView.View1.Lines.Assign(fBase.GetRecordContent(fRec1, RecordContentType.Quick));
             }
         }
 
@@ -207,52 +228,52 @@ namespace GKCore.Controllers
             } else {
                 GetControl<ILabel>("Lab2").Text = fRec2.XRef;
                 GetControl<ITextBox>("Edit2").Text = GKUtils.GetRecordName(fBase.Context.Tree, fRec2, false);
-                fView.View2.Lines.Assign(fBase.GetRecordContent(fRec2));
+                fView.View2.Lines.Assign(fBase.GetRecordContent(fRec2, RecordContentType.Quick));
             }
         }
 
-        public void SelectRec1()
+        public async void SelectRec1()
         {
-            GDMRecord irec = fBase.Context.SelectRecord(fView, fMergeMode, null);
+            GDMRecord irec = await fBase.Context.SelectRecord(fView, fMergeMode, null);
             if (irec != null)
                 SetRec1(irec);
         }
 
-        public void SelectRec2()
+        public async void SelectRec2()
         {
-            GDMRecord irec = fBase.Context.SelectRecord(fView, fMergeMode, null);
+            GDMRecord irec = await fBase.Context.SelectRecord(fView, fMergeMode, null);
             if (irec != null)
                 SetRec2(irec);
         }
 
-        public void MergeToLeft()
+        public async void MergeToLeft()
         {
-            TreeTools.MergeRecord(fBase, fRec1, fRec2, fBookmark);
+            await TreeTools.MergeRecord(fBase, fRec1, fRec2, fBookmark);
             SetRec1(fRec1);
             SetRec2(null);
         }
 
-        public void MergeToRight()
+        public async void MergeToRight()
         {
-            TreeTools.MergeRecord(fBase, fRec2, fRec1, fBookmark);
+            await TreeTools.MergeRecord(fBase, fRec2, fRec1, fBookmark);
             SetRec1(null);
             SetRec2(fRec2);
         }
 
-        private bool EditRecord(GDMRecord record)
+        private async Task<bool> EditRecord(GDMRecord record)
         {
-            return (record != null && BaseController.EditRecord(fView, fBase, record));
+            return (record != null && await BaseController.EditRecord(fView, fBase, record));
         }
 
-        public void EditLeft()
+        public async void EditLeft()
         {
-            if (EditRecord(fRec1))
+            if (await EditRecord(fRec1))
                 SetRec1(fRec1);
         }
 
-        public void EditRight()
+        public async void EditRight()
         {
-            if (EditRecord(fRec2))
+            if (await EditRecord(fRec2))
                 SetRec2(fRec2);
         }
     }

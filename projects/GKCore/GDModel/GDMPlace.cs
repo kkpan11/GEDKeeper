@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2021 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -73,12 +73,7 @@ namespace GDModel
             SetName(GEDCOMTagType.PLAC);
 
             fForm = string.Empty;
-            fLocation = new GDMPointer((int)GEDCOMTagType._LOC, string.Empty);
-        }
-
-        public GDMPlace(int tagId, string tagValue) : this()
-        {
-            SetNameValue(tagId, tagValue);
+            fLocation = new GDMPointer((int)GEDCOMTagType._LOC);
         }
 
         protected override void Dispose(bool disposing)
@@ -135,6 +130,16 @@ namespace GDModel
             fLocation.ReplaceXRefs(map);
             if (fMap != null) fMap.ReplaceXRefs(map);
             if (fNotes != null) fNotes.ReplaceXRefs(map);
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fForm);
+            hashCode.Add(fLocation);
+            hashCode.Add(fMap);
+            ProcessHashes(ref hashCode, fNotes);
         }
     }
 }

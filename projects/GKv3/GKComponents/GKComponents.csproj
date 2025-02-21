@@ -8,7 +8,10 @@
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <DefineConstants>DIS_VLC</DefineConstants>
 
-        <Configurations>MSWin_Debug;MSWin_Release;Linux_Debug;Linux_Release;MacOS_Debug;MacOS_Release;FreeBSD_Debug;FreeBSD_Release</Configurations>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>MSWin64;Linux;MacOS;FreeBSD</Platforms>
+
+        <NoWarn>$(NoWarn);NU1902;NU1903;NU1904</NoWarn>
     </PropertyGroup>
 
     <Import Project="..\..\GKConfigurations3.targets" />
@@ -33,11 +36,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Eto.Forms" Version="2.8.0" />
-        <PackageReference Include="Eto.Serialization.Xaml" Version="2.8.0" />
+        <PackageReference Include="Eto.Forms" Version="2.8.3" />
+        <PackageReference Include="Eto.Serialization.Xaml" Version="2.8.3" />
         <PackageReference Include="OxyPlot.Eto" Version="1.1.0" />
         <PackageReference Include="ExifLibNet" Version="2.1.4" />
-        <PackageReference Include="SixLabors.ImageSharp" Version="3.0.1" />
+        <PackageReference Include="SixLabors.ImageSharp" Version="3.1.6" />
     </ItemGroup>
 
     <ItemGroup Condition=" !$(DefineConstants.Contains('DIS_VLC')) ">

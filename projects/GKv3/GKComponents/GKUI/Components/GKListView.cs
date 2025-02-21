@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -20,6 +20,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using BSLib;
 using Eto.Drawing;
 using Eto.Forms;
@@ -214,6 +215,8 @@ namespace GKUI.Components
 
         public event ItemCheckEventHandler ItemCheck;
 
+        public event EventHandler ItemsUpdated;
+
 
         public GKListView()
         {
@@ -303,21 +306,14 @@ namespace GKUI.Components
             base.OnColumnHeaderClick(e);
         }
 
-        // In Eto not exists
-        /*protected override void OnDrawColumnHeader(DrawListViewColumnHeaderEventArgs e)
-        {
-        }*/
-
         /*protected override void OnSelectionChanged(EventArgs e)
         {
             base.OnSelectionChanged(e);
 
             // FIXME: [Wpf]GridView.ReloadData(...) is very slow, Eto 2.7.0 #2245
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-                return;
+                base.ReloadData(base.SelectedRow);
             }
-
-            base.ReloadData(base.SelectedRow);
         }*/
 
         private int fRowFormatting = -1;
@@ -425,21 +421,21 @@ namespace GKUI.Components
             }
         }
 
+        private void DoItemsUpdated()
+        {
+            var eventHandler = ItemsUpdated;
+            if (eventHandler != null) eventHandler(this, new EventArgs());
+        }
+
         public void UpdateContents(bool columnsChanged = false)
         {
             if (fListMan == null) return;
 
             try {
-                if (fListMan.ColumnsHaveBeenChanged != columnsChanged && columnsChanged) {
-                    fListMan.ColumnsHaveBeenChanged = columnsChanged;
-                }
-
                 object tempRec = GetSelectedData();
-
                 BeginUpdate();
                 try {
-                    if (columnsChanged || Columns.Count == 0 || fListMan.ColumnsHaveBeenChanged) {
-                        Columns.Clear();
+                    if (columnsChanged || Columns.Count == 0) {
                         fListMan.UpdateColumns(this);
                     }
 
@@ -449,9 +445,10 @@ namespace GKUI.Components
                     ResizeColumns();
                 } finally {
                     EndUpdate();
-                }
+                    if (tempRec != null) SelectItem(tempRec);
 
-                if (tempRec != null) SelectItem(tempRec);
+                    DoItemsUpdated();
+                }
             } catch (Exception ex) {
                 Logger.WriteError("GKListView.UpdateContents()", ex);
             }
@@ -619,6 +616,10 @@ namespace GKUI.Components
 
         public void SelectItem(int index)
         {
+            if (index == -1) {
+                index = ContentList.Count - 1;
+            }
+
             if (index >= 0 && index < ContentList.Count) {
                 ScrollToRow(index);
                 UnselectAll();

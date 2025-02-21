@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -31,7 +31,6 @@ using GKCore.Charts;
 using GKCore.Controllers;
 using GKCore.Design.Controls;
 using GKCore.Design.Views;
-using GKCore.Export;
 using GKCore.Interfaces;
 using GKCore.Lists;
 using GKCore.Options;
@@ -104,10 +103,11 @@ namespace GKUI.Forms
             tbTreeDescendants.Image = UIHelper.LoadResourceImage("Resources.btn_tree_descendants.gif");
             tbTreeBoth.Image = UIHelper.LoadResourceImage("Resources.btn_tree_both.gif");
             tbPedigree.Image = UIHelper.LoadResourceImage("Resources.btn_scroll.gif");
-            tbStats.Image = UIHelper.LoadResourceImage("Resources.btn_table.gif");
+            tbStats.Image = UIHelper.LoadResourceImage("Resources.btn_chart.gif");
             tbPrev.Image = UIHelper.LoadResourceImage("Resources.btn_left.gif");
             tbNext.Image = UIHelper.LoadResourceImage("Resources.btn_right.gif");
             tbSendMail.Image = UIHelper.LoadResourceImage("Resources.btn_mail.gif");
+            tbPartialView.Image = UIHelper.LoadResourceImage("Resources.btn_table.gif");
 
             UIHelper.FixToolStrip(ToolBar1);
 
@@ -296,9 +296,11 @@ namespace GKUI.Forms
 
         private void contextMenu_Opening(object sender, CancelEventArgs e)
         {
-            IListView recView = contextMenu.SourceControl as GKListView;
+            var recType = GetSelectedRecordType();
+            miContRecordDuplicate.Enabled = (recType == GDMRecordType.rtIndividual || recType == GDMRecordType.rtLocation);
 
-            miContRecordDuplicate.Enabled = (recView == fController.GetRecordsViewByType(GDMRecordType.rtIndividual));
+            miContMediaMoveFile.Visible = (recType == GDMRecordType.rtMultimedia);
+            miContMediaMoveFile2Abs.Enabled = false;
         }
 
         private void miRecordAdd_Click(object sender, EventArgs e)
@@ -323,13 +325,35 @@ namespace GKUI.Forms
 
         private void miRecordMerge_Click(object sender, EventArgs e)
         {
-            var recView = contextMenu.SourceControl as GKListView;
+            var recView = GetRecordsViewByType(GetSelectedRecordType()) as GKListView;
             if (recView != null) {
                 var items = recView.GetSelectedItems();
                 BaseController.ShowRecMerge(this, this,
                     items.Count > 0 ? items[0] as GDMRecord : null,
                     items.Count > 1 ? items[1] as GDMRecord : null
                 );
+            }
+        }
+
+        private void miContMediaMoveFile_Click(object sender, EventArgs e)
+        {
+            MediaStoreType storeType;
+            if (sender == miContMediaMoveFile2Abs) {
+                storeType = MediaStoreType.mstReference;
+            } else if (sender == miContMediaMoveFile2Rel) {
+                storeType = MediaStoreType.mstRelativeReference;
+            } else if (sender == miContMediaMoveFile2Arc) {
+                storeType = MediaStoreType.mstArchive;
+            } else if (sender == miContMediaMoveFile2Stg) {
+                storeType = MediaStoreType.mstStorage;
+            } else {
+                return;
+            }
+
+            var recView = GetRecordsViewByType(GetSelectedRecordType()) as GKListView;
+            if (recView != null) {
+                var items = recView.GetSelectedItems();
+                fController.MoveMediaFiles(items, storeType);
             }
         }
 
@@ -349,13 +373,12 @@ namespace GKUI.Forms
 
         private void mPersonSummaryLink(object sender, string linkName)
         {
-            fController.SelectSummaryLink(linkName);
+            fController.SelectSummaryLink((IHyperView)sender, linkName);
         }
 
         private void miCopyContent_Click(object sender, EventArgs e)
         {
-            var hyperView = summaryMenu.SourceControl as HyperView;
-            fController.CopyContent(hyperView);
+            fController.CopyContent();
         }
 
         #endregion
@@ -490,35 +513,7 @@ namespace GKUI.Forms
 
         public void ShowMedia(GDMMultimediaRecord mediaRec, bool modal)
         {
-            if (mediaRec == null)
-                throw new ArgumentNullException("mediaRec");
-
-            GDMFileReferenceWithTitle fileRef = mediaRec.FileReferences[0];
-            if (fileRef == null) return;
-
-            if (!GKUtils.UseEmbeddedViewer(fileRef.MultimediaFormat)) {
-                string targetFile = fContext.MediaLoad(fileRef);
-                GKUtils.LoadExtFile(targetFile);
-            } else {
-                //var mediaViewer = AppHost.Container.Resolve<IMediaViewerWin>(this);
-                MediaViewerWin mediaViewer = new MediaViewerWin(this);
-                try {
-                    try {
-                        mediaViewer.MultimediaRecord = mediaRec;
-                        if (modal) {
-                            mediaViewer.ShowDialog();
-                        } else {
-                            mediaViewer.ShowInTaskbar = true;
-                            mediaViewer.Show();
-                        }
-                    } finally {
-                        if (modal) mediaViewer.Dispose();
-                    }
-                } catch (Exception ex) {
-                    if (mediaViewer != null) mediaViewer.Dispose();
-                    Logger.WriteError("BaseWinSDI.ShowMedia()", ex);
-                }
-            }
+            BaseController.ShowMedia(this, mediaRec, modal);
         }
 
         #endregion
@@ -641,9 +636,9 @@ namespace GKUI.Forms
             fController.SelectRecordByXRef(xref, delayedTransition);
         }
 
-        public StringList GetRecordContent(GDMRecord record)
+        public StringList GetRecordContent(GDMRecord record, RecordContentType contentType)
         {
-            return fController.GetRecordContent(record);
+            return fController.GetRecordContent(record, contentType);
         }
 
         public bool RecordIsFiltered(GDMRecord record)
@@ -667,7 +662,7 @@ namespace GKUI.Forms
             e.Effect = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
         }
 
-        private void Form_DragDrop(object sender, DragEventArgs e)
+        private async void Form_DragDrop(object sender, DragEventArgs e)
         {
             try {
                 try {
@@ -678,10 +673,11 @@ namespace GKUI.Forms
 
                     for (int i = 0; i < files.Length; i++) {
                         string fn = files[i];
-                        AppHost.Instance.LoadBase(this, fn);
+                        await AppHost.Instance.LoadBase(this, fn);
                     }
+
+                    await AppHost.Instance.EndLoading();
                 } finally {
-                    AppHost.Instance.EndLoading();
                 }
             } catch (Exception ex) {
                 Logger.WriteError("BaseWinSDI.Form_DragDrop()", ex);
@@ -690,8 +686,8 @@ namespace GKUI.Forms
 
         void IBaseWindowView.LoadBase(string fileName)
         {
-            MethodInvoker invoker = delegate() {
-                AppHost.Instance.LoadBase(this, fileName);
+            MethodInvoker invoker = async delegate() {
+                await AppHost.Instance.LoadBase(this, fileName);
             };
 
             if (InvokeRequired) {
@@ -715,10 +711,10 @@ namespace GKUI.Forms
             UpdateShieldState();
         }
 
-        private void MRUFileClick(object sender, EventArgs e)
+        private async void MRUFileClick(object sender, EventArgs e)
         {
             int idx = (int)((MenuItemEx)sender).Tag;
-            AppHost.Instance.LoadBase(this, AppHost.Options.MRUFiles[idx].FileName);
+            await AppHost.Instance.LoadBase(this, AppHost.Options.MRUFiles[idx].FileName);
         }
 
         public void UpdateMRU()
@@ -871,6 +867,16 @@ namespace GKUI.Forms
             fController.ShowFamilyGroups();
         }
 
+        private void miPhotosBatchAdding_Click(object sender, EventArgs e)
+        {
+            fController.ShowPhotosBatchAdding();
+        }
+
+        private void miCleanImagesCache_Click(object sender, EventArgs e)
+        {
+            AppHost.CleanImagesCache();
+        }
+
         private void miOptions_Click(object sender, EventArgs e)
         {
             AppHost.Instance.ShowOptions(this);
@@ -886,9 +892,9 @@ namespace GKUI.Forms
             fController.NewFile();
         }
 
-        private void miFileLoad_Click(object sender, EventArgs e)
+        private async void miFileLoad_Click(object sender, EventArgs e)
         {
-            fController.LoadFileEx();
+            await fController.LoadFileEx();
         }
 
         private void miFileSaveAs_Click(object sender, EventArgs e)
@@ -929,6 +935,11 @@ namespace GKUI.Forms
         private void tbSendMail_Click(object sender, EventArgs e)
         {
             fController.SendMail();
+        }
+
+        private void tbPartialView_Click(object sender, EventArgs e)
+        {
+            fController.ShowPartialView();
         }
 
         private void miMap_Click(object sender, EventArgs e)
@@ -983,12 +994,12 @@ namespace GKUI.Forms
 
         private void miAncestorsCircle_Click(object sender, EventArgs e)
         {
-            fController.ShowCircleChart(CircleChartType.Ancestors);
+            BaseController.ShowCircleChart(this, CircleChartType.Ancestors);
         }
 
         private void miDescendantsCircle_Click(object sender, EventArgs e)
         {
-            fController.ShowCircleChart(CircleChartType.Descendants);
+            BaseController.ShowCircleChart(this, CircleChartType.Descendants);
         }
 
         private void miLogSend_Click(object sender, EventArgs e)

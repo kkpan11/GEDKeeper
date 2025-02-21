@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,38 +19,47 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using BSLib;
 using GDModel;
-using GKCore.Interfaces;
-using GKCore.Design.Views;
-using GKCore.Operations;
-using GKCore.Types;
 using GKCore.Design;
+using GKCore.Design.Views;
+using GKCore.Interfaces;
+using GKCore.Operations;
+using GKCore.Options;
+using GKCore.Types;
 
 namespace GKCore.Lists
 {
     public sealed class EventsListModel : SheetModel<GDMCustomEvent>
     {
-        private readonly bool fPersonsMode;
+        private readonly GlobalOptions fOptions;
 
-        public EventsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman, bool personsMode) : base(owner, baseWin, undoman)
+        public EventsListModel(IView owner, IBaseWindow baseWin, ChangeTracker undoman) : base(owner, baseWin, undoman, CreateListColumns())
         {
-            fPersonsMode = personsMode;
             AllowedActions = EnumSet<RecordAction>.Create(
                 RecordAction.raAdd, RecordAction.raEdit, RecordAction.raDelete,
                 RecordAction.raMoveUp, RecordAction.raMoveDown,
                 RecordAction.raCopy, RecordAction.raPaste);
 
-            fListColumns.AddColumn(LSID.NumberSym, 25, false);
-            fListColumns.AddColumn(LSID.Event, 90, false);
-            fListColumns.AddColumn(LSID.Date, 80, false);
-            if (!fPersonsMode) {
-                fListColumns.AddColumn(LSID.Place, 200, false);
-            } else {
-                fListColumns.AddColumn(LSID.PlaceAndAttribute, 200, false);
-            }
-            fListColumns.AddColumn(LSID.Cause, 130, false);
-            fListColumns.ResetDefaults();
+            fOptions = GlobalOptions.Instance;
+        }
+
+        public static ListColumns CreateListColumns()
+        {
+            var result = new ListColumns(GKListType.stEvents);
+
+            result.AddColumn(LSID.NumberSym, 25, false);
+            result.AddColumn(LSID.Event, 90, false);
+            result.AddColumn(LSID.Date, 90, false);
+            result.AddColumn(LSID.PlaceAndAttribute, 200, false);
+            result.AddColumn(LSID.Cause, 130, false);
+            result.AddColumn(LSID.RPSources, 32, false);
+            result.AddColumn(LSID.RPNotes, 32, false);
+            result.AddColumn(LSID.RPMultimedia, 32, false);
+
+            result.ResetDefaults();
+            return result;
         }
 
         protected override object GetColumnValueEx(int colType, int colSubtype, bool isVisible)
@@ -67,18 +76,19 @@ namespace GKCore.Lists
                     result = new GDMDateItem(fFetchedRec.Date.Value);
                     break;
                 case 3:
-                    if (fPersonsMode) {
-                        string st = fFetchedRec.Place.StringValue;
-                        if (fFetchedRec.StringValue != "") {
-                            st = st + " [" + fFetchedRec.StringValue + "]";
-                        }
-                        result = st;
-                    } else {
-                        result = fFetchedRec.Place.StringValue;
-                    }
+                    result = GKUtils.GetEventPlaceAndAttributeValues(fFetchedRec);
                     break;
                 case 4:
                     result = GKUtils.GetEventCause(fFetchedRec);
+                    break;
+                case 5:
+                    result = fFetchedRec.HasSourceCitations ? (fOptions.ShowNumberOfSubstructures ? fFetchedRec.SourceCitations.Count.ToString() : GKData.CHECK_MARK) : string.Empty;
+                    break;
+                case 6:
+                    result = fFetchedRec.HasNotes ? (fOptions.ShowNumberOfSubstructures ? fFetchedRec.Notes.Count.ToString() : GKData.CHECK_MARK) : string.Empty;
+                    break;
+                case 7:
+                    result = fFetchedRec.HasMultimediaLinks ? (fOptions.ShowNumberOfSubstructures ? fFetchedRec.MultimediaLinks.Count.ToString() : GKData.CHECK_MARK) : string.Empty;
                     break;
             }
             return result;
@@ -87,16 +97,11 @@ namespace GKCore.Lists
         public override void UpdateContents()
         {
             var dataOwner = fDataOwner as GDMRecordWithEvents;
-            if (dataOwner == null) return;
-
-            try {
+            if (dataOwner != null)
                 UpdateStructList(dataOwner.Events);
-            } catch (Exception ex) {
-                Logger.WriteError("EventsListModel.UpdateContents()", ex);
-            }
         }
 
-        public override void Modify(object sender, ModifyEventArgs eArgs)
+        public override async Task Modify(object sender, ModifyEventArgs eArgs)
         {
             GDMRecordWithEvents record = fDataOwner as GDMRecordWithEvents;
             if (fBaseWin == null || record == null) return;
@@ -108,12 +113,11 @@ namespace GKCore.Lists
             try {
                 switch (eArgs.Action) {
                     case RecordAction.raAdd:
-                    case RecordAction.raEdit:
-                        using (var dlg = AppHost.ResolveDialog<IEventEditDlg>(fBaseWin)) {
+                    case RecordAction.raEdit: {
                             bool exists = (evt != null);
 
                             GDMCustomEvent newEvent;
-                            if (evt != null) {
+                            if (exists) {
                                 newEvent = evt;
                             } else {
                                 if (record is GDMIndividualRecord) {
@@ -123,16 +127,17 @@ namespace GKCore.Lists
                                 }
                             }
 
-                            dlg.Event = newEvent;
-                            result = AppHost.Instance.ShowModalX(dlg, fOwner, true);
+                            using (var dlg = AppHost.ResolveDialog<IEventEditDlg>(fBaseWin)) {
+                                dlg.Event = newEvent;
+                                result = await AppHost.Instance.ShowModalAsync(dlg, fOwner, true);
+                                newEvent = dlg.Event; // In this dialog the event object can be replaced
+                            }
 
                             if (!result) {
                                 if (!exists) {
                                     newEvent.Dispose();
                                 }
                             } else {
-                                newEvent = dlg.Event;
-
                                 if (!exists) {
                                     result = fUndoman.DoOrdinaryOperation(OperationType.otRecordEventAdd, record, newEvent);
                                 } else {
@@ -149,27 +154,15 @@ namespace GKCore.Lists
                         break;
 
                     case RecordAction.raDelete:
-                        if (AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.RemoveEventQuery))) {
+                        if (await AppHost.StdDialogs.ShowQuestion(LangMan.LS(LSID.RemoveEventQuery))) {
                             result = fUndoman.DoOrdinaryOperation(OperationType.otRecordEventRemove, record, evt);
                             evt = null;
                         }
                         break;
 
                     case RecordAction.raMoveUp:
-                    case RecordAction.raMoveDown:
-                        {
-                            int idx = record.Events.IndexOf(evt);
-                            switch (eArgs.Action) {
-                                case RecordAction.raMoveUp:
-                                    record.Events.Exchange(idx - 1, idx);
-                                    break;
-
-                                case RecordAction.raMoveDown:
-                                    record.Events.Exchange(idx, idx + 1);
-                                    break;
-                            }
-                            result = true;
-                        }
+                    case RecordAction.raMoveDown: 
+                        result = record.Events.Exchange(evt, eArgs.Action);
                         break;
 
                     case RecordAction.raCopy:

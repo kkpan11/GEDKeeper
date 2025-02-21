@@ -11,7 +11,8 @@
         <DefineConstants>LUC48</DefineConstants>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 
-        <Configurations>MSWin_Debug;MSWin_Release;Linux_Debug;Linux_Release;MacOS_Debug;MacOS_Release;FreeBSD_Debug;FreeBSD_Release</Configurations>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>MSWin64;Linux;MacOS;FreeBSD</Platforms>
     </PropertyGroup>
 
     <Import Project="..\..\GKConfigurations3.targets" />
@@ -29,11 +30,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Eto.Forms" Version="2.8.0" />
-        <PackageReference Include="Eto.Serialization.Xaml" Version="2.8.0" />
-        <PackageReference Include="Lucene.Net" Version="4.8.0-beta00016" />
-        <PackageReference Include="Lucene.Net.Analysis.Common" Version="4.8.0-beta00016" />
-        <PackageReference Include="Lucene.Net.QueryParser" Version="4.8.0-beta00016" />
+        <PackageReference Include="Eto.Forms" Version="2.8.3" />
+        <PackageReference Include="Eto.Serialization.Xaml" Version="2.8.3" />
+        <PackageReference Include="Lucene.Net" Version="4.8.0-beta00017" />
+        <PackageReference Include="Lucene.Net.Analysis.Common" Version="4.8.0-beta00017" />
+        <PackageReference Include="Lucene.Net.QueryParser" Version="4.8.0-beta00017" />
     </ItemGroup>
 
     <Import Project="GKTextSearchPlugin.props" />

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -18,9 +18,11 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using BSLib;
 using GDModel;
 using GDModel.Providers.GEDCOM;
 using GKCore.Interfaces;
+using GKCore.Options;
 
 namespace GKCore.Lists
 {
@@ -33,6 +35,7 @@ namespace GKCore.Lists
         {
             ctXRefNum,
             ctName,
+            ctExt,
             ctLati,
             ctLong,
             ctChangeDate
@@ -40,16 +43,17 @@ namespace GKCore.Lists
 
 
         public LocationListModel(IBaseContext baseContext) :
-            base(baseContext, CreateLocationListColumns(), GDMRecordType.rtLocation)
+            base(baseContext, CreateListColumns(), GDMRecordType.rtLocation)
         {
         }
 
-        public static ListColumns<GDMLocationRecord> CreateLocationListColumns()
+        public static ListColumns CreateListColumns()
         {
-            var result = new ListColumns<GDMLocationRecord>();
+            var result = new ListColumns(GKListType.rtLocation);
 
             result.AddColumn(LSID.NumberSym, DataType.dtInteger, 50, true);
             result.AddColumn(LSID.Title, DataType.dtString, 300, true, true);
+            result.AddColumn("Ext", DataType.dtString, 60, true, false);
             result.AddColumn(LSID.Latitude, DataType.dtFloat, 120, true, false, GEDCOMUtils.CoordFormat, GEDCOMUtils.CoordNumberFormatInfo);
             result.AddColumn(LSID.Longitude, DataType.dtFloat, 120, true, false, GEDCOMUtils.CoordFormat, GEDCOMUtils.CoordNumberFormatInfo);
             result.AddColumn(LSID.Changed, DataType.dtDateTime, 150, true);
@@ -58,13 +62,51 @@ namespace GKCore.Lists
             return result;
         }
 
+        private bool CheckQuickFilter()
+        {
+            var quickFilter = base.QuickFilter;
+
+            var names = fFetchedRec.Names;
+            for (int i = 0; i < names.Count; i++) {
+                var locName = names[i].StringValue;
+
+                bool res;
+                if (quickFilter.Type == MatchType.Indistinct) {
+                    res = (IndistinctMatching.GetSimilarity(locName, quickFilter.Value) >= quickFilter.IndistinctThreshold);
+                } else {
+                    res = IsMatchesMask(locName, quickFilter.Value);
+                }
+
+                if (res) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public override bool CheckFilter()
         {
-            bool res = CheckQuickFilter(fFetchedRec.LocationName);
+            bool res = CheckQuickFilter();
 
             res = res && CheckCommonFilter() && CheckExternalFilter(fFetchedRec);
 
             return res;
+        }
+
+        protected override bool CheckCommonCondition(FilterCondition fcond)
+        {
+            if ((ColumnType)fcond.ColumnIndex == ColumnType.ctName) {
+                var names = fFetchedRec.Names;
+                for (int i = 0; i < names.Count; i++) {
+                    if (CheckCondition(fcond, names[i].StringValue)) {
+                        return true;
+                    }
+                }
+                return false;
+            } else {
+                return base.CheckCommonCondition(fcond);
+            }
         }
 
         protected override object GetColumnValueEx(int colType, int colSubtype, bool isVisible)
@@ -76,7 +118,11 @@ namespace GKCore.Lists
                     break;
 
                 case ColumnType.ctName:
-                    result = fFetchedRec.LocationName;
+                    result = fFetchedRec.GetNameByDate(null, true);
+                    break;
+
+                case ColumnType.ctExt:
+                    result = (fFetchedRec.Names.Count > 1 || fFetchedRec.TopLevels.Count > 0) ? GKData.CHECK_MARK : string.Empty;
                     break;
 
                 case ColumnType.ctLati:

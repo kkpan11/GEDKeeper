@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,7 @@ using GKCore;
 using GKCore.Design.Controls;
 using GKCore.Lists;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKUI.Components
 {
@@ -43,6 +44,7 @@ namespace GKUI.Components
         private readonly Button fBtnCopy;
         private readonly Button fBtnCut;
         private readonly Button fBtnPaste;
+        private readonly ContextMenu fContextMenu;
         private readonly GKListView fList;
 
         private EnumSet<SheetButton> fButtons;
@@ -76,12 +78,17 @@ namespace GKUI.Components
                     if (fListModel != null) {
                         fListModel.SheetList = null;
                     }
+                    fList.ContextMenu = null;
 
                     fListModel = value;
 
                     if (fListModel != null) {
                         fList.ListMan = fListModel;
                         fListModel.SheetList = this;
+
+                        if (fListModel.AllowedActions.Contains(RecordAction.raDetails)) {
+                            fList.ContextMenu = fContextMenu;
+                        }
                     }
                 }
 
@@ -113,9 +120,17 @@ namespace GKUI.Components
             fBtnEdit = CreateButton("btnEdit", UIHelper.LoadResourceImage("Resources.btn_rec_edit.gif"), LangMan.LS(LSID.MIRecordEdit), ItemEdit);
             fBtnAdd = CreateButton( "btnAdd", UIHelper.LoadResourceImage("Resources.btn_rec_new.gif"), LangMan.LS(LSID.MIRecordAdd), ItemAdd);
 
+            var miDetails = new ButtonMenuItem();
+            miDetails.Text = LangMan.LS(LSID.Details);
+            miDetails.Click += miDetails_Click;
+
+            fContextMenu = new ContextMenu();
+            fContextMenu.Items.AddRange(new MenuItem[] { miDetails });
+
             fList = new GKListView();
             fList.MouseDoubleClick += List_DoubleClick;
             fList.KeyDown += List_KeyDown;
+            fList.SelectedItemsChanged += List_SelectedIndexChanged;
 
             SuspendLayout();
 
@@ -171,6 +186,19 @@ namespace GKUI.Components
             fList.UpdateContents();
         }
 
+        public void ApplyTheme()
+        {
+            UIHelper.SetButtonThemeImage(fBtnPaste, ThemeElement.Glyph_Paste);
+            UIHelper.SetButtonThemeImage(fBtnCut, ThemeElement.Glyph_Cut);
+            UIHelper.SetButtonThemeImage(fBtnCopy, ThemeElement.Glyph_Copy);
+            UIHelper.SetButtonThemeImage(fBtnMoveDown, ThemeElement.Glyph_MoveDown);
+            UIHelper.SetButtonThemeImage(fBtnMoveUp, ThemeElement.Glyph_MoveUp);
+            UIHelper.SetButtonThemeImage(fBtnLinkJump, ThemeElement.Glyph_LinkJump);
+            UIHelper.SetButtonThemeImage(fBtnDelete, ThemeElement.Glyph_ItemDelete);
+            UIHelper.SetButtonThemeImage(fBtnEdit, ThemeElement.Glyph_ItemEdit);
+            UIHelper.SetButtonThemeImage(fBtnAdd, ThemeElement.Glyph_ItemAdd);
+        }
+
         #region Private methods
 
         private Button CreateButton(string name, Image image, string toolTip, EventHandler<EventArgs> click)
@@ -183,7 +211,7 @@ namespace GKUI.Components
             return btn;
         }
 
-        private void UpdateButtons()
+        public void UpdateButtons()
         {
             if (fListModel == null) {
                 fBtnAdd.Visible = fButtons.Contains(SheetButton.lbAdd);
@@ -226,6 +254,27 @@ namespace GKUI.Components
             fList.BackgroundColor = (fReadOnly) ? SystemColors.Control : SystemColors.WindowBackground;
         }
 
+        private void List_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (fListModel != null) {
+                int itemIndex = -1; // fList.SelectedIndex;
+                object itemData = fList.GetSelectedData();
+                if (itemData == null) return;
+
+                fListModel.OnItemSelected(itemIndex, itemData);
+            }
+        }
+
+        private void miDetails_Click(object sender, EventArgs e)
+        {
+            if (fListModel != null) {
+                object itemData = fList.GetSelectedData();
+                if (itemData != null) {
+                    fListModel.ShowDetails(itemData);
+                }
+            }
+        }
+
         private void List_DoubleClick(object sender, EventArgs e)
         {
             ItemEdit(sender, e);
@@ -234,6 +283,7 @@ namespace GKUI.Components
         private void List_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Control) {
+                bool handled = true;
                 switch (e.Key) {
                     case Keys.I:
                         ItemAdd(sender, e);
@@ -254,7 +304,11 @@ namespace GKUI.Components
                     case Keys.V:
                         ItemPaste(sender, e);
                         break;
+                    default:
+                        handled = false;
+                        break;
                 }
+                e.Handled = handled;
             }
         }
 

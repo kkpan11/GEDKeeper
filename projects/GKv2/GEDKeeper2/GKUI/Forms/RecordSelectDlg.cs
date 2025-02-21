@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -23,6 +23,7 @@ using System.Windows.Forms;
 using GDModel;
 using GKCore;
 using GKCore.Controllers;
+using GKCore.Design;
 using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Interfaces;
@@ -38,15 +39,21 @@ namespace GKUI.Forms
         private readonly RecordSelectDlgController fController;
 
         private GKListView fListRecords;
+        private ContextMenuStrip contextMenu;
 
 
         public GDMRecord ResultRecord { get; set; }
 
         #region View Interface
 
-        IComboBox IRecordSelectDialog.FilterBox
+        IComboBox IRecordSelectDialog.FilterCombo
         {
             get { return GetControlHandler<IComboBox>(txtFastFilter); }
+        }
+
+        ITextBox IRecordSelectDialog.FilterText
+        {
+            get { return null; }
         }
 
         IFilterControl IRecordSelectDialog.FilterCtl
@@ -66,6 +73,8 @@ namespace GKUI.Forms
         {
             InitializeComponent();
 
+            TabIndexChanged += Form_TabIndexChanged;
+
             btnSelect.Image = UIHelper.LoadResourceImage("Resources.btn_accept.gif");
             btnCancel.Image = UIHelper.LoadResourceImage("Resources.btn_cancel.gif");
 
@@ -75,7 +84,22 @@ namespace GKUI.Forms
 
             fltCtl.ParamsChanged += txtFastFilter_TextChanged;
 
+            var miDetails = new ToolStripMenuItem();
+            miDetails.Text = LangMan.LS(LSID.Details);
+            miDetails.Click += miDetails_Click;
+
+            contextMenu = new ContextMenuStrip();
+            contextMenu.Items.AddRange(new ToolStripItem[] { miDetails });
+
             UpdateRecordsView();
+        }
+
+        private void Form_TabIndexChanged(object sender, EventArgs e)
+        {
+            if (fltCtl.Focused) {
+                fListRecords.Focus();
+                fListRecords.SelectItem(0);
+            }
         }
 
         protected override void Dispose(bool disposing)
@@ -99,13 +123,19 @@ namespace GKUI.Forms
             }
             fListRecords = UIHelper.CreateRecordsView(panList, fController.Base.Context, fController.RecType, true);
             fListRecords.Name = "fListRecords";
+            fListRecords.ContextMenuStrip = contextMenu;
+        }
+
+        private void miDetails_Click(object sender, EventArgs e)
+        {
+            fController.ShowDetails();
         }
 
         private void btnSelect_Click(object sender, EventArgs e)
         {
             try {
                 ResultRecord = fListRecords.GetSelectedData() as GDMRecord;
-                DialogResult = DialogResult.OK;
+                Close(DialogResult.OK);
             } catch (Exception ex) {
                 Logger.WriteError("RecordSelectDlg.btnSelect_Click()", ex);
                 ResultRecord = null;
@@ -113,13 +143,13 @@ namespace GKUI.Forms
             }
         }
 
-        private void btnCreate_Click(object sender, EventArgs e)
+        private async void btnCreate_Click(object sender, EventArgs e)
         {
             try {
-                GDMRecord rec = BaseController.AddRecord(this, fController.Base, fController.RecType, fController.Target);
+                GDMRecord rec = await BaseController.AddRecord(this, fController.Base, fController.RecType, fController.Target);
                 if (rec != null) {
                     ResultRecord = rec;
-                    DialogResult = DialogResult.OK;
+                    Close(DialogResult.OK);
                 }
             } catch (Exception ex) {
                 Logger.WriteError("RecordSelectDlg.btnCreate_Click()", ex);

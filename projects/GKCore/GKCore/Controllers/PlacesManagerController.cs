@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -21,11 +21,13 @@
 using System.Collections.Generic;
 using BSLib;
 using GDModel;
-using GKCore.Design.Controls;
+using GDModel.Providers.GEDCOM;
 using GKCore.Design;
+using GKCore.Design.Controls;
 using GKCore.Design.Views;
 using GKCore.Tools;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -46,18 +48,67 @@ namespace GKCore.Controllers
         {
         }
 
+        public void SyncAll()
+        {
+            AppHost.Instance.ExecuteWork((controller) => {
+                GEDCOMChecker.SyncTreeLocations(fBase.Context, controller);
+            });
+        }
+
         public void Clear()
         {
             TreeTools.SearchPlaces_Clear(fPlaces);
             fPlaces.Dispose();
         }
 
+        public async void ShowLocExpert()
+        {
+            var placeObj = fView.PlacesList.GetSelectedData() as PlaceObj;
+            if (placeObj == null) return;
+
+            string placeName = placeObj.Name;
+
+            var eventDates = new SortedSet<GDMCustomDate>();
+            foreach (var evt in placeObj.Facts) {
+                if (!evt.Date.IsEmpty())
+                    eventDates.Add(evt.Date);
+            }
+
+            using (var dlg = AppHost.ResolveDialog<ILocExpertDlg>(fBase, eventDates, placeName)) {
+                await AppHost.Instance.ShowModalAsync(dlg, fView);
+            }
+        }
+
+        public void ShowDetails()
+        {
+            var placeObj = fView.PlacesList.GetSelectedData() as PlaceObj;
+            if (placeObj == null) return;
+
+            var strList = new StringList();
+            strList.Add("[u][b][size=+1]" + placeObj.Name + "[/size][/b][/u]");
+            strList.Add("");
+            strList.Add(LangMan.LS(LSID.Events) + ":");
+            for (int i = 0; i < placeObj.Facts.Count; i++) {
+                var evt = placeObj.Facts[i];
+                strList.Add("");
+
+                string st = GKUtils.GetEventName(evt);
+                strList.Add("  " + st + ": " + GKUtils.GetEventDesc(fBase.Context.Tree, evt));
+            }
+            strList.Add("");
+
+            string result = strList.Text;
+
+            BaseController.ViewTextInfo(fView, fBase, result);
+        }
+
         public void CheckPlaces()
         {
             fView.PlacesList.BeginUpdate();
             try {
+                string fltText = fView.FilterBox.Text;
                 AppHost.Instance.ExecuteWork((controller) => {
-                    TreeTools.SearchPlaces(fBase.Context.Tree, fPlaces, controller, fView.FilterBox.Text);
+                    TreeTools.SearchPlaces(fBase.Context.Tree, fPlaces, controller, fltText);
                 });
 
                 fView.PlacesList.ClearItems();
@@ -73,15 +124,16 @@ namespace GKCore.Controllers
             }
         }
 
-        public void CreateLocationRecord(IList<object> placesList)
+        public async void CreateLocationRecord(IList<object> placesList)
         {
             PlaceObj pObj = placesList.Count > 0 ? (PlaceObj) placesList[0] : null;
             if (pObj == null) return;
 
-            if (pObj.Name.IndexOf("[*]") == 0) {
+            // for cases [*] and [**]
+            if (pObj.Name.Contains("*]")) {
                 AppHost.StdDialogs.ShowMessage(LangMan.LS(LSID.PlaceAlreadyInBook));
             } else {
-                GDMLocationRecord locRec = fBase.Context.SelectRecord(fView, GDMRecordType.rtLocation, new object[] { pObj.Name }) as GDMLocationRecord;
+                GDMLocationRecord locRec = await fBase.Context.SelectRecord(fView, GDMRecordType.rtLocation, new object[] { pObj.Name }) as GDMLocationRecord;
                 if (locRec == null) return;
 
                 for (var pi = 0; pi < placesList.Count; pi++) {
@@ -89,7 +141,7 @@ namespace GKCore.Controllers
                     int num = place.Facts.Count;
                     for (int i = 0; i < num; i++) {
                         GDMCustomEvent evt = place.Facts[i];
-                        evt.Place.StringValue = locRec.LocationName;
+                        evt.Place.StringValue = GKUtils.GetLocationNameExt(locRec, evt.Date.Value);
                         evt.Place.Location.XRef = locRec.XRef;
                     }
                 }
@@ -101,11 +153,12 @@ namespace GKCore.Controllers
 
         public override void SetLocale()
         {
-            fView.Title = LangMan.LS(LSID.ToolOp_9);
+            fView.Title = LangMan.LS(LSID.PlacesManager);
 
             if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
-                GetControl<ITabPage>("pagePlaceManage").Text = LangMan.LS(LSID.ToolOp_9);
+                GetControl<ITabPage>("pagePlaceManage").Text = LangMan.LS(LSID.PlacesManager);
                 GetControl<IButton>("btnClose").Text = LangMan.LS(LSID.DlgClose);
+                GetControl<IButton>("btnLocExpert").Text = LangMan.LS(LSID.LocExpert);
             }
 
             GetControl<IButton>("btnIntoList").Text = LangMan.LS(LSID.InsertIntoBook);
@@ -114,6 +167,13 @@ namespace GKCore.Controllers
 
             fView.PlacesList.AddColumn(LangMan.LS(LSID.Place), 400, false);
             fView.PlacesList.AddColumn(LangMan.LS(LSID.LinksCount), 100, false);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnClose").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

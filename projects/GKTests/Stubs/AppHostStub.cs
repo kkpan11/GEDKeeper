@@ -86,7 +86,7 @@ namespace GKTests.Stubs
                 try {
                     workerThread.Start(progressForm);
 
-                    progressForm.ShowModalX(activeWnd);
+                    //progressForm.ShowModalX(activeWnd);
                 } catch (Exception ex) {
                     Logger.WriteError("ExecuteWork()", ex);
                 }
@@ -244,6 +244,10 @@ namespace GKTests.Stubs
         }
 
         public override void LayoutWindows(WinLayout layout)
+        {
+        }
+
+        public override void SetWindowBounds(IWindow window, ExtRect bounds)
         {
         }
     }

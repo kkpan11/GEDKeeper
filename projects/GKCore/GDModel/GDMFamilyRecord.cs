@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2022 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -70,8 +70,8 @@ namespace GDModel
         {
             SetName(GEDCOMTagType.FAM);
 
-            fHusband = new GDMIndividualLink((int)GEDCOMTagType.HUSB, string.Empty);
-            fWife = new GDMIndividualLink((int)GEDCOMTagType.WIFE, string.Empty);
+            fHusband = new GDMIndividualLink((int)GEDCOMTagType.HUSB);
+            fWife = new GDMIndividualLink((int)GEDCOMTagType.WIFE);
             fChildren = new GDMList<GDMChildLink>();
         }
 
@@ -133,7 +133,7 @@ namespace GDModel
 
             for (int i = fChildren.Count - 1; i >= 0; i--) {
                 if (fChildren[i].XRef == childRec.XRef) {
-                    fChildren.DeleteAt(i);
+                    fChildren.RemoveAt(i);
                     break;
                 }
             }
@@ -145,7 +145,7 @@ namespace GDModel
 
             for (int i = fChildren.Count - 1; i >= 0; i--) {
                 if (fChildren[i].XRef == childPtr.XRef) {
-                    fChildren.DeleteAt(i);
+                    fChildren.RemoveAt(i);
                     break;
                 }
             }
@@ -275,6 +275,11 @@ namespace GDModel
             }
         }
 
+        public bool HasMember(GDMIndividualRecord member)
+        {
+            return HasSpouse(member) || HasChild(member);
+        }
+
         public bool HasSpouse(GDMIndividualRecord spouse)
         {
             return (spouse != null) && (fHusband.XRef == spouse.XRef || fWife.XRef == spouse.XRef);
@@ -304,6 +309,16 @@ namespace GDModel
         public bool HasChild(GDMIndividualRecord child)
         {
             return IndexOfChild(child) >= 0;
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            ProcessHashes(ref hashCode, fChildren);
+            hashCode.Add(fHusband);
+            hashCode.Add(fWife);
+            hashCode.Add(fStatus);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -19,6 +19,7 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using BSLib;
 using GKCore;
 using GKCore.Design.Controls;
@@ -122,7 +123,8 @@ namespace GKUI.Components
             fList = new GKListView();
             fList.HorizontalOptions = LayoutOptions.FillAndExpand;
             fList.VerticalOptions = LayoutOptions.FillAndExpand;
-            //fList.MouseDoubleClick += List_DoubleClick;
+            fList.MouseDoubleClick += ItemEdit;
+            fList.ItemSelected += List_SelectedIndexChanged;
 
             fToolBar = new StackLayout() {
                 Orientation = StackOrientation.Vertical,
@@ -165,7 +167,7 @@ namespace GKUI.Components
             return btn;
         }
 
-        private void UpdateButtons()
+        public void UpdateButtons()
         {
             if (fListModel == null) {
                 fBtnAdd.IsVisible = fButtons.Contains(SheetButton.lbAdd);
@@ -208,9 +210,15 @@ namespace GKUI.Components
             //fList.BackgroundColor = (fReadOnly) ? SystemColors.Control : SystemColors.WindowBackground;
         }
 
-        private void List_DoubleClick(object sender, EventArgs e)
+        private void List_SelectedIndexChanged(object sender, EventArgs e)
         {
-            ItemEdit(sender, e);
+            if (fListModel != null) {
+                int itemIndex = -1; // fList.SelectedIndex;
+                object itemData = fList.GetSelectedData();
+                if (itemData == null) return;
+
+                fListModel.OnItemSelected(itemIndex, itemData);
+            }
         }
 
         private void RestoreSelected(object itemData)
@@ -229,12 +237,12 @@ namespace GKUI.Components
             }
         }
 
-        private void DoModify(ModifyEventArgs eArgs)
+        private async Task DoModify(ModifyEventArgs eArgs)
         {
             DoBeforeChange(eArgs);
 
             if (fListModel != null) {
-                fListModel.Modify(this, eArgs);
+                await fListModel.Modify(this, eArgs);
 
                 if (eArgs.IsChanged) {
                     UpdateSheet();
@@ -260,16 +268,16 @@ namespace GKUI.Components
             return args.IsAvailable;
         }
 
-        private void ItemAdd(object sender, EventArgs e)
+        private async void ItemAdd(object sender, EventArgs e)
         {
             if (fReadOnly) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raAdd, null);
-            DoModify(eArgs);
+            await DoModify(eArgs);
             RestoreSelected(eArgs.ItemData);
         }
 
-        private void ItemEdit(object sender, EventArgs e)
+        private async void ItemEdit(object sender, EventArgs e)
         {
             object itemData = fList.GetSelectedData();
             if (fReadOnly || itemData == null) return;
@@ -277,11 +285,11 @@ namespace GKUI.Components
             if (!ValidateItem(itemData)) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raEdit, itemData);
-            DoModify(eArgs);
+            await DoModify(eArgs);
             RestoreSelected(eArgs.ItemData);
         }
 
-        private void ItemDelete(object sender, EventArgs e)
+        private async void ItemDelete(object sender, EventArgs e)
         {
             object itemData = fList.GetSelectedData();
             if (fReadOnly || itemData == null) return;
@@ -289,10 +297,10 @@ namespace GKUI.Components
             if (!ValidateItem(itemData)) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raDelete, itemData);
-            DoModify(eArgs);
+            await DoModify(eArgs);
         }
 
-        private void ItemJump(object sender, EventArgs e)
+        private async void ItemJump(object sender, EventArgs e)
         {
             object itemData = fList.GetSelectedData();
             if (itemData == null) return;
@@ -300,54 +308,54 @@ namespace GKUI.Components
             if (!ValidateItem(itemData)) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raJump, itemData);
-            DoModify(eArgs);
+            await DoModify(eArgs);
         }
 
-        private void ItemMoveUp(object sender, EventArgs e)
+        private async void ItemMoveUp(object sender, EventArgs e)
         {
             object itemData = fList.GetSelectedData();
             if (fReadOnly || itemData == null) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raMoveUp, itemData);
-            DoModify(eArgs);
+            await DoModify(eArgs);
             RestoreSelected(eArgs.ItemData);
         }
 
-        private void ItemMoveDown(object sender, EventArgs e)
+        private async void ItemMoveDown(object sender, EventArgs e)
         {
             object itemData = fList.GetSelectedData();
             if (fReadOnly || itemData == null) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raMoveDown, itemData);
-            DoModify(eArgs);
+            await DoModify(eArgs);
             RestoreSelected(eArgs.ItemData);
         }
 
-        private void ItemCopy(object sender, EventArgs e)
+        private async void ItemCopy(object sender, EventArgs e)
         {
             object itemData = fList.GetSelectedData();
             if (fReadOnly || itemData == null) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raCopy, itemData);
-            DoModify(eArgs);
+            await DoModify(eArgs);
             RestoreSelected(eArgs.ItemData);
         }
 
-        private void ItemCut(object sender, EventArgs e)
+        private async void ItemCut(object sender, EventArgs e)
         {
             object itemData = fList.GetSelectedData();
             if (fReadOnly || itemData == null) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raCut, itemData);
-            DoModify(eArgs);
+            await DoModify(eArgs);
         }
 
-        private void ItemPaste(object sender, EventArgs e)
+        private async void ItemPaste(object sender, EventArgs e)
         {
             if (fReadOnly) return;
 
             var eArgs = new ModifyEventArgs(RecordAction.raPaste, null);
-            DoModify(eArgs);
+            await DoModify(eArgs);
             RestoreSelected(eArgs.ItemData);
         }
 

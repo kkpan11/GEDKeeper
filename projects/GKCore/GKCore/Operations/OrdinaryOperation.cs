@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2021 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -71,7 +71,16 @@ namespace GKCore.Operations
 
         otIndividualBookmarkChange,
         otIndividualPatriarchChange,
-        otIndividualSexChange
+        otIndividualSexChange,
+
+        otLocationNameAdd,
+        otLocationNameRemove,
+
+        otLocationLinkAdd,
+        otLocationLinkRemove,
+
+        otCallNumberAdd,
+        otCallNumberRemove,
     }
 
     /// <summary>
@@ -80,12 +89,12 @@ namespace GKCore.Operations
     public class OrdinaryOperation : CustomOperation
     {
         private readonly OperationType fType;
-        private readonly GDMObject fObj;
+        private readonly IGDMObject fObj;
         private object fOldVal;
         private readonly object fNewVal;
 
         public OrdinaryOperation(UndoManager manager, OperationType type,
-                                 GDMObject obj, object newVal) : base(manager)
+                                 IGDMObject obj, object newVal) : base(manager)
         {
             fType = type;
             fObj = obj;
@@ -185,7 +194,7 @@ namespace GKCore.Operations
 
                 case OperationType.otIndividualURefAdd:
                 case OperationType.otIndividualURefRemove:
-                    result = ProcessIndividualURef(redo);
+                    result = ProcessRecordURef(redo);
                     break;
 
                 case OperationType.otIndividualPortraitAttach:
@@ -203,6 +212,21 @@ namespace GKCore.Operations
 
                 case OperationType.otIndividualSexChange:
                     result = ProcessIndividualSexChange(redo);
+                    break;
+
+                case OperationType.otLocationNameAdd:
+                case OperationType.otLocationNameRemove:
+                    result = ProcessLocationName(redo);
+                    break;
+
+                case OperationType.otLocationLinkAdd:
+                case OperationType.otLocationLinkRemove:
+                    result = ProcessLocationLink(redo);
+                    break;
+
+                case OperationType.otCallNumberAdd:
+                case OperationType.otCallNumberRemove:
+                    result = ProcessCallNumber(redo);
                     break;
 
                 default:
@@ -276,9 +300,9 @@ namespace GKCore.Operations
         private bool ProcessSourceRepositoryCitation(bool redo)
         {
             GDMSourceRecord srcRec = fObj as GDMSourceRecord;
-            GDMRepositoryRecord repRec = fNewVal as GDMRepositoryRecord;
+            var repCit = fNewVal as GDMRepositoryCitation;
 
-            if (srcRec == null || repRec == null) {
+            if (srcRec == null || repCit == null) {
                 return false;
             }
 
@@ -286,9 +310,9 @@ namespace GKCore.Operations
                 redo = !redo;
             }
             if (redo) {
-                srcRec.AddRepository(repRec);
+                srcRec.RepositoryCitations.Add(repCit);
             } else {
-                srcRec.RemoveRepository(repRec);
+                srcRec.RepositoryCitations.Extract(repCit);
             }
             return true;
         }
@@ -365,7 +389,7 @@ namespace GKCore.Operations
                     fOldVal = notes;
                 } else {
                     GDMNotes notes = fOldVal as GDMNotes;
-                    swl.Notes.Delete(notes);
+                    swl.Notes.Remove(notes);
                 }
             }
             return result;
@@ -399,7 +423,7 @@ namespace GKCore.Operations
                     fOldVal = mmLink;
                 } else {
                     GDMMultimediaLink mmLink = fOldVal as GDMMultimediaLink;
-                    swl.MultimediaLinks.Delete(mmLink);
+                    swl.MultimediaLinks.Remove(mmLink);
                 }
             }
             return result;
@@ -501,9 +525,9 @@ namespace GKCore.Operations
             return true;
         }
 
-        private bool ProcessIndividualURef(bool redo)
+        private bool ProcessRecordURef(bool redo)
         {
-            GDMIndividualRecord iRec = fObj as GDMIndividualRecord;
+            GDMRecord iRec = fObj as GDMRecord;
             GDMUserReference uRef = fNewVal as GDMUserReference;
 
             if (iRec == null || uRef == null) {
@@ -605,6 +629,66 @@ namespace GKCore.Operations
                 iRec.Sex = (GDMSex) fNewVal;
             } else {
                 iRec.Sex = (GDMSex) fOldVal;
+            }
+            return true;
+        }
+
+        private bool ProcessLocationName(bool redo)
+        {
+            GDMLocationRecord locRec = fObj as GDMLocationRecord;
+            GDMLocationName locName = fNewVal as GDMLocationName;
+
+            if (locRec == null || locName == null) {
+                return false;
+            }
+
+            if (fType == OperationType.otLocationNameRemove) {
+                redo = !redo;
+            }
+            if (redo) {
+                locRec.Names.Add(locName);
+            } else {
+                locRec.Names.Extract(locName);
+            }
+            return true;
+        }
+
+        private bool ProcessLocationLink(bool redo)
+        {
+            GDMLocationRecord locRec = fObj as GDMLocationRecord;
+            GDMLocationLink locLink = fNewVal as GDMLocationLink;
+
+            if (locRec == null || locLink == null) {
+                return false;
+            }
+
+            if (fType == OperationType.otLocationLinkRemove) {
+                redo = !redo;
+            }
+            if (redo) {
+                locRec.TopLevels.Add(locLink);
+            } else {
+                locRec.TopLevels.Extract(locLink);
+            }
+            return true;
+        }
+
+        private bool ProcessCallNumber(bool redo)
+        {
+            GDMRepositoryCitation repoCit = fObj as GDMRepositoryCitation;
+            GDMSourceCallNumber callNum = fNewVal as GDMSourceCallNumber;
+
+            if (repoCit == null || callNum == null) {
+                return false;
+            }
+
+            if (fType == OperationType.otCallNumberRemove) {
+                redo = !redo;
+            }
+            if (redo) {
+                repoCit.CallNumbers.Add(callNum);
+            } else {
+                repoCit.CallNumbers.Extract(callNum);
             }
             return true;
         }

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -39,14 +39,53 @@ namespace GKUI.Platform
         {
         }
 
+        public void FreeImage(ref IImage image)
+        {
+            try {
+                if (image == null) return;
+
+                if (image is SKImageHandler) {
+                    var imgHandler = image as SKImageHandler;
+                    if (imgHandler == null) return;
+
+                    var imgDisposable = imgHandler.Handle.Image as IDisposable;
+                    if (imgDisposable == null) return;
+
+                    imgDisposable.Dispose();
+                }
+
+                if (image is XFImageHandler) {
+                    var imgHandler = image as XFImageHandler;
+                    if (imgHandler == null) return;
+
+                    var imgDisposable = imgHandler.Handle as IDisposable;
+                    if (imgDisposable == null) return;
+
+                    imgDisposable.Dispose();
+                }
+
+                image = null;
+            } catch (Exception ex) {
+                Logger.WriteError("XFGfxProvider.FreeImage()", ex);
+            }
+        }
+
         public Stream CheckOrientation(Stream inputStream)
         {
             return inputStream;
         }
 
-        public IImage LoadImage(Stream stream, int thumbWidth, int thumbHeight, ExtRect cutoutArea)
+        public IImage LoadImage(Stream stream, int thumbWidth, int thumbHeight, ExtRect cutoutArea, string cachedFile)
         {
-            return null;
+            if (stream == null)
+                throw new ArgumentNullException("stream");
+
+            try {
+                var img = SKImage.FromEncodedData(stream);
+                return new SKImageHandler(img);
+            } finally {
+                stream.Close();
+            }
         }
 
         public IImage LoadImage(string fileName)
@@ -58,18 +97,25 @@ namespace GKUI.Platform
             return new XFImageHandler(img);
         }
 
-        public IImage LoadResourceImage(Type baseType, string resName)
+        public IImage LoadResourceImage(Type baseType, string resName, ImageTarget target)
         {
             if (string.IsNullOrEmpty(resName))
                 return null;
 
-            var img = ImageSource.FromResource(resName, baseType.Assembly);
-            return new XFImageHandler(img);
+            if (target == ImageTarget.UI) {
+                var img = ImageSource.FromResource(resName, baseType.Assembly);
+                return new XFImageHandler(img);
+            } else {
+                using (var stream = GKUtils.LoadResourceStream(baseType, resName)) {
+                    var img = SKImage.FromEncodedData(stream);
+                    return new SKImageHandler(img);
+                }
+            }
         }
 
-        public IImage LoadResourceImage(string resName, bool makeTransp = false)
+        public IImage LoadResourceImage(string resName, ImageTarget target, bool makeTransp = false)
         {
-            return LoadResourceImage(typeof(GKUtils), resName);
+            return LoadResourceImage(typeof(GKUtils), resName, target);
         }
 
         public void SaveImage(IImage image, string fileName)
@@ -129,6 +175,11 @@ namespace GKUI.Platform
             fontName = "Verdana";
 #endif
             return fontName;
+        }
+
+        public float GetDefaultFontSize()
+        {
+            return (float)Device.GetNamedSize(NamedSize.Default, typeof(Label));
         }
     }
 }

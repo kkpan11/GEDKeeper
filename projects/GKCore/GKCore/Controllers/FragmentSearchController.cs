@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -28,6 +28,7 @@ using GKCore.Design.Views;
 using GKCore.Interfaces;
 using GKCore.Tools;
 using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -132,7 +133,7 @@ namespace GKCore.Controllers
 
         public override void SetLocale()
         {
-            fView.Title = LangMan.LS(LSID.ToolOp_6);
+            fView.Title = LangMan.LS(LSID.FragmentSearch);
 
             if (!AppHost.Instance.HasFeatureSupport(Feature.Mobile)) {
                 GetControl<IMenuItem>("miDetails").Text = LangMan.LS(LSID.Details);
@@ -142,10 +143,15 @@ namespace GKCore.Controllers
                 GetControl<IMenuItem>("miDQResetFilter").Text = LangMan.LS(LSID.ResetFilter);
             }
 
-            GetControl<ITabPage>("pageFamilyGroups").Text = LangMan.LS(LSID.ToolOp_6);
+            GetControl<ITabPage>("pageFamilyGroups").Text = LangMan.LS(LSID.FragmentSearch);
             GetControl<IButton>("btnAnalyseGroups").Text = LangMan.LS(LSID.Analyze);
 
             GetControl<ITabPage>("pageDataQuality").Text = LangMan.LS(LSID.DataQuality);
+        }
+
+        public override void ApplyTheme()
+        {
+            // dummy
         }
 
         public void OpeningContextMenu()

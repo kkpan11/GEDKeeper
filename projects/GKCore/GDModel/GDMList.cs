@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2021 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -25,24 +25,22 @@ using BSLib;
 
 namespace GDModel
 {
-    public sealed class GDMList<T> : IDisposable, IEnumerable<T> where T : GDMTag
+    public sealed class GDMList<T> : IGDMList<T>
+        where T : GDMTag
     {
         #region ListEnumerator
 
         private struct GEDCOMListEnumerator : IGDMListEnumerator<T>
         {
-            private readonly GDMList<T> fOwnList;
+            private readonly IList<T> fDataList;
             private int fIndex;
             private int fSize;
 
             public GEDCOMListEnumerator(GDMList<T> list)
             {
-                fOwnList = list;
-
+                fDataList = list.fDataList;
                 fIndex = -1;
-
-                List<T> dataList = list.fDataList;
-                fSize = ((dataList == null) ? 0 : dataList.Count);
+                fSize = (fDataList == null) ? 0 : fDataList.Count;
             }
 
             void IDisposable.Dispose()
@@ -53,9 +51,7 @@ namespace GDModel
             void IEnumerator.Reset()
             {
                 fIndex = -1;
-
-                List<T> dataList = fOwnList.fDataList;
-                fSize = ((dataList == null) ? 0 : dataList.Count);
+                fSize = (fDataList == null) ? 0 : fDataList.Count;
             }
 
             bool IEnumerator.MoveNext()
@@ -66,12 +62,12 @@ namespace GDModel
 
             object IEnumerator.Current
             {
-                get { return fOwnList.fDataList[fIndex]; }
+                get { return fDataList[fIndex]; }
             }
 
             T IEnumerator<T>.Current
             {
-                get { return fOwnList.fDataList[fIndex]; }
+                get { return fDataList[fIndex]; }
             }
         }
 
@@ -94,7 +90,7 @@ namespace GDModel
         public T this[int index]
         {
             get {
-                return (fDataList == null) ? default(T) : fDataList[index];
+                return (fDataList == null) ? default : fDataList[index];
             }
         }
         
@@ -171,7 +167,7 @@ namespace GDModel
             return (fDataList == null) ? -1 : fDataList.IndexOf(item);
         }
 
-        public void DeleteAt(int index)
+        public void RemoveAt(int index)
         {
             if (fDataList == null) return;
             
@@ -179,7 +175,7 @@ namespace GDModel
             fDataList.RemoveAt(index);
         }
 
-        public void Delete(T item)
+        public void Remove(T item)
         {
             if (fDataList == null) return;
 
@@ -203,7 +199,7 @@ namespace GDModel
 
         public T Extract(int index)
         {
-            if (fDataList == null) return default(T);
+            if (fDataList == null) return default;
 
             T result = fDataList[index];
             fDataList.RemoveAt(index);
@@ -212,14 +208,14 @@ namespace GDModel
 
         public T Extract(T item)
         {
-            if (fDataList == null) return default(T);
+            if (fDataList == null) return default;
 
             int index = fDataList.IndexOf(item);
             if (index >= 0) {
                 fDataList.RemoveAt(index);
                 return item;
             } else {
-                return default(T);
+                return default;
             }
         }
 
@@ -227,8 +223,7 @@ namespace GDModel
         {
             if (fDataList == null) return;
 
-            int num = fDataList.Count;
-            for (int i = 0; i < num; i++) {
+            for (int i = 0, num = fDataList.Count; i < num; i++) {
                 var item = fDataList[i];
                 if (item != null) {
                     item.ReplaceXRefs(map);
@@ -245,14 +240,13 @@ namespace GDModel
 
         internal void TrimExcess()
         {
-            if (fDataList != null) {
-                fDataList.TrimExcess();
+            if (fDataList == null) return;
 
-                for (int i = 0, num = fDataList.Count; i < num; i++) {
-                    var item = fDataList[i];
-                    if (item != null) {
-                        item.TrimExcess();
-                    }
+            fDataList.TrimExcess();
+            for (int i = 0, num = fDataList.Count; i < num; i++) {
+                var item = fDataList[i];
+                if (item != null) {
+                    item.TrimExcess();
                 }
             }
         }

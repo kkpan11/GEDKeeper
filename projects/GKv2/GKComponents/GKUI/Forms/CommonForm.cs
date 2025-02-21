@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -21,10 +21,10 @@
 using System;
 using System.ComponentModel;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using GKCore;
 using GKCore.Design;
-using GKCore.Design.Controls;
 using GKCore.Interfaces;
 using GKUI.Themes;
 
@@ -33,7 +33,7 @@ namespace GKUI.Forms
     /// <summary>
     /// 
     /// </summary>
-    public class CommonForm : Form, IView, IThemedView
+    public class CommonForm : Form, IView, IThemedForm
     {
         private readonly IContainer fComponents;
         private readonly ToolTip fToolTip;
@@ -171,14 +171,43 @@ namespace GKUI.Forms
     /// </summary>
     public class CommonDialog : CommonForm, ICommonDialog
     {
-        public virtual bool ShowModalX(IView owner)
+        private readonly TaskCompletionSource<bool> fTaskSource;
+
+        public Task<bool> DialogResultTask
         {
-            return (ShowDialog(owner as IWin32Window) == DialogResult.OK);
+            get { return fTaskSource.Task; }
+        }
+
+        public CommonDialog()
+        {
+            fTaskSource = new TaskCompletionSource<bool>();
+        }
+
+        protected void Close(DialogResult dialogResult)
+        {
+            if (dialogResult != DialogResult.None) {
+                base.DialogResult = dialogResult;
+                fTaskSource.SetResult(dialogResult == DialogResult.OK);
+            }
+        }
+
+        protected virtual void AcceptClickHandler(object sender, EventArgs e)
+        {
+            Close(DialogResult.OK);
         }
 
         protected virtual void CancelClickHandler(object sender, EventArgs e)
         {
-            DialogResult = DialogResult.Cancel;
+            Close(DialogResult.Cancel);
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            // To correctly close the dialog using the button in the dialog header.
+            if (!e.Cancel && !fTaskSource.Task.IsCompleted)
+                fTaskSource.SetResult(false);
+
+            base.OnClosing(e);
         }
     }
 
@@ -192,28 +221,30 @@ namespace GKUI.Forms
     {
         protected TController fController;
 
-        protected virtual void AcceptClickHandler(object sender, EventArgs e)
+        protected override void AcceptClickHandler(object sender, EventArgs e)
         {
             try {
-                DialogResult = fController.Accept() ? DialogResult.OK : DialogResult.None;
+                if (fController.Accept())
+                    Close(DialogResult.OK);
             } catch (Exception ex) {
                 Logger.WriteError("CommonDialog<>.AcceptClickHandler()", ex);
             }
         }
 
-        protected override void CancelClickHandler(object sender, EventArgs e)
+        protected override async void CancelClickHandler(object sender, EventArgs e)
         {
             try {
-                DialogResult = fController.Cancel() ? DialogResult.Cancel : DialogResult.None;
+                if (await fController.Cancel())
+                    Close(DialogResult.Cancel);
             } catch (Exception ex) {
                 Logger.WriteError("CommonDialog<>.CancelClickHandler()", ex);
             }
         }
 
-        protected override void OnClosing(CancelEventArgs e)
+        protected override async void OnClosing(CancelEventArgs e)
         {
+            e.Cancel = await fController.CheckChangesPersistence();
             base.OnClosing(e);
-            e.Cancel = fController.CheckChangesPersistence();
         }
 
         /// <summary>

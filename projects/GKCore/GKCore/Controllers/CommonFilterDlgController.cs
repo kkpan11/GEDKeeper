@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -23,6 +23,8 @@ using GKCore.Design.Controls;
 using GKCore.Interfaces;
 using GKCore.Design;
 using GKCore.Design.Views;
+using GKCore.Types;
+using GKUI.Themes;
 
 namespace GKCore.Controllers
 {
@@ -76,13 +78,25 @@ namespace GKCore.Controllers
 
         public override void SetLocale()
         {
+            fView.Title = LangMan.LS(LSID.MIFilter);
+
             GKData.CondSigns[6] = LangMan.LS(LSID.CondContains);
             GKData.CondSigns[7] = LangMan.LS(LSID.CondNotContains);
+            GKData.CondSigns[8] = LangMan.LS(LSID.CondContainsMask);
+            GKData.CondSigns[9] = LangMan.LS(LSID.CondNotContainsMask);
 
             GetControl<IButton>("btnAccept").Text = LangMan.LS(LSID.DlgAccept);
             GetControl<IButton>("btnCancel").Text = LangMan.LS(LSID.DlgCancel);
             GetControl<IButton>("btnReset").Text = LangMan.LS(LSID.DlgReset);
             GetControl<ITabPage>("pageFieldsFilter").Text = LangMan.LS(LSID.FieldsFilter);
+        }
+
+        public override void ApplyTheme()
+        {
+            if (!AppHost.Instance.HasFeatureSupport(Feature.Themes)) return;
+
+            GetControl<IButton>("btnAccept").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Accept);
+            GetControl<IButton>("btnCancel").Glyph = AppHost.ThemeManager.GetThemeImage(ThemeElement.Glyph_Cancel);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -66,6 +66,9 @@ namespace GDModel
             set { fCause = value; }
         }
 
+        /// <summary>
+        /// Tag "TYPE" (GEDCOM 5.5.1 Specification).
+        /// </summary>
         public string Classification
         {
             get { return fClassification; }
@@ -295,6 +298,23 @@ namespace GDModel
         public int GetChronologicalYear()
         {
             return Date.GetChronologicalYear();
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fAddress);
+            hashCode.Add(fAgency);
+            hashCode.Add(fCause);
+            hashCode.Add(fClassification);
+            hashCode.Add(fDate);
+            hashCode.Add(fPlace);
+            hashCode.Add(fReligiousAffilation);
+            hashCode.Add(fRestriction);
+            ProcessHashes(ref hashCode, fNotes);
+            ProcessHashes(ref hashCode, fSourceCitations);
+            ProcessHashes(ref hashCode, fMultimediaLinks);
         }
     }
 }

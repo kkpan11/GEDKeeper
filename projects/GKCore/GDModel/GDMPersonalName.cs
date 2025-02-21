@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2021 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -26,6 +26,7 @@ namespace GDModel
     public enum GDMNameType
     {
         ntNone,
+        ntAdoption, // FIXME: user defined name types (gh#550)
         ntAka,
         ntBirth,
         ntImmigrant,
@@ -381,6 +382,26 @@ namespace GDModel
             }
 
             return match;
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fGiven);
+            hashCode.Add(fLanguage);
+            hashCode.Add(fNamePrefix);
+            hashCode.Add(fNameSuffix);
+            hashCode.Add(fNameType);
+            hashCode.Add(fNickname);
+            ProcessHashes(ref hashCode, fNotes);
+            ProcessHashes(ref hashCode, fSourceCitations);
+            hashCode.Add(fSurnamePrefix);
+            hashCode.Add(fSurname);
+            hashCode.Add(fPatronymicName);
+            hashCode.Add(fMarriedName);
+            hashCode.Add(fReligiousName);
+            hashCode.Add(fCensusName);
         }
     }
 }

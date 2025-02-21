@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2018-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2018-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -56,7 +56,7 @@ namespace GKStdReports
                 Type = type;
                 Rec = rec;
                 Event = evt;
-                Date = (evt == null) ? UDN.CreateUnknown() : evt.Date.GetUDN();
+                Date = (evt == null) ? UDN.Unknown : evt.Date.GetUDN();
             }
         }
 
@@ -71,7 +71,7 @@ namespace GKStdReports
             fPerson = selectedPerson;
         }
 
-        private void ExtractEvents(EventType type, IList<PersonalEvent> list, IGDMRecordWithEvents record)
+        private static void ExtractEvents(EventType type, IList<PersonalEvent> list, IGDMRecordWithEvents record)
         {
             if (!record.HasEvents) return;
 

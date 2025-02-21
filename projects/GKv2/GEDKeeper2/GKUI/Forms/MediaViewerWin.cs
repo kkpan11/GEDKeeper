@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2025 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -48,6 +48,12 @@ namespace GKUI.Forms
             get { return fController.Base; }
         }
 
+        public object ViewControl
+        {
+            get {
+                return fViewer;
+            }
+        }
 
         public MediaViewerWin(IBaseWindow baseWin)
         {
@@ -136,7 +142,7 @@ namespace GKUI.Forms
         public void SetViewImage(IImage img)
         {
             var imageCtl = new GKUI.Components.ImageView();
-            imageCtl.OpenImage(img);
+            imageCtl.OpenImage(fController, img);
 
             fController.ProcessPortraits(imageCtl);
 
@@ -163,6 +169,12 @@ namespace GKUI.Forms
             Controls.SetChildIndex(ctl, 0);
 
             ResumeLayout(false);
+        }
+
+        public override void ApplyTheme()
+        {
+            base.ApplyTheme();
+            fController.ApplyTheme();
         }
     }
 }

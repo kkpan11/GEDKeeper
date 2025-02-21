@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2021 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -76,7 +76,12 @@ namespace GDModel
             fId = 0; // Unknown
         }
 
-        public GDMTag(int tagId, string tagValue) : this()
+        public GDMTag(int tagId)
+        {
+            fId = tagId;
+        }
+
+        public GDMTag(int tagId, string tagValue)
         {
             SetNameValue(tagId, tagValue);
         }
@@ -99,17 +104,6 @@ namespace GDModel
             }
         }
 
-        public void SetNameValue(int tagId, string tagValue)
-        {
-            if (tagId != 0) {
-                SetName(tagId);
-            }
-
-            if (!string.IsNullOrEmpty(tagValue)) {
-                ParseString(tagValue);
-            }
-        }
-
         internal virtual void TrimExcess()
         {
             if (fTags != null) {
@@ -121,6 +115,14 @@ namespace GDModel
 
         #region Content management
 
+        protected void SetNameValue(int tagId, string tagValue)
+        {
+            fId = tagId;
+            if (!string.IsNullOrEmpty(tagValue)) {
+                ParseString(tagValue);
+            }
+        }
+
         public void SetName(int tagId)
         {
             fId = tagId;
@@ -128,7 +130,7 @@ namespace GDModel
 
         public void SetName(GEDCOMTagType tag)
         {
-            SetName((int)tag);
+            fId = (int)tag;
         }
 
         public GDMTag AddTag(GDMTag tag)
@@ -183,7 +185,7 @@ namespace GDModel
             GDMTag tag = FindTag(tagName, 0);
             while (tag != null) {
                 int idx = fTags.IndexOf(tag);
-                fTags.DeleteAt(idx);
+                fTags.RemoveAt(idx);
 
                 tag = FindTag(tagName, idx);
             }
@@ -281,6 +283,29 @@ namespace GDModel
         }
 
         #endregion
+
+        protected static void ProcessHashes<T>(ref HashCode hashCode, GDMList<T> tags) where T : GDMTag
+        {
+            if (tags == null) return;
+
+            for (int i = 0; i < tags.Count; i++) {
+                var tag = tags[i];
+                tag.ProcessHashes(ref hashCode);
+            }
+        }
+
+        protected virtual void ProcessHashes(ref HashCode hashCode)
+        {
+            hashCode.Add(fId);
+            ProcessHashes(ref hashCode, fTags);
+        }
+
+        public override int GetHashCode()
+        {
+            var result = new HashCode();
+            ProcessHashes(ref result);
+            return result.ToHashCode();
+        }
     }
 
 
@@ -293,7 +318,12 @@ namespace GDModel
             fStringValue = string.Empty;
         }
 
-        public GDMValueTag(int tagId, string tagValue) : this()
+        public GDMValueTag(int tagId) : base(tagId)
+        {
+            fStringValue = string.Empty;
+        }
+
+        public GDMValueTag(int tagId, string tagValue)
         {
             SetNameValue(tagId, tagValue);
         }
@@ -318,6 +348,13 @@ namespace GDModel
         {
             fStringValue = strValue;
             return string.Empty;
+        }
+
+        protected override void ProcessHashes(ref HashCode hashCode)
+        {
+            base.ProcessHashes(ref hashCode);
+
+            hashCode.Add(fStringValue);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿/*
  *  "GEDKeeper", the personal genealogical database editor.
- *  Copyright (C) 2009-2023 by Sergey V. Zhdanovskih.
+ *  Copyright (C) 2009-2024 by Sergey V. Zhdanovskih.
  *
  *  This file is part of "GEDKeeper".
  *
@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using BSLib;
 using BSLib.DataViz.SmartGraph;
 using GDModel;
+using GDModel.Providers.GEDCOM;
 using GKCore.Design.Graphics;
 using GKCore.Import;
 using GKCore.Options;
@@ -52,7 +53,7 @@ namespace GKCore.Charts
         pfHasInvAnc, pfHasInvDesc, // invisible flags
         pfSpecialMark, // debug flag for special goals
         pfOutsideKin, pfCanExpand, pfAdopted,
-        pfRootSpouse, pfBookmark
+        pfRootSpouse, pfBookmark, pfCommonLaw
     }
 
     /// <summary>
@@ -92,6 +93,8 @@ namespace GKCore.Charts
         public float CertaintyAssessment;
         public TreeChartPerson Father;
         public TreeChartPerson Mother;
+        public string FatherAge;
+        public string MotherAge;
         public int Generation;
         public string Kinship;
         public string[] Lines;
@@ -103,6 +106,7 @@ namespace GKCore.Charts
         public IColor UserColor;
         public int NameLines;
         public string Note;
+        public GDMSourceCitation[] Sources;
 
 
         public int Height
@@ -294,17 +298,32 @@ namespace GKCore.Charts
 
                     TreeChartOptions options = fModel.Options;
 
-                    var lifeDates = iRec.GetLifeDates();
+                    var lifeDates = iRec.GetLifeEvents(true);
+                    GDMCustomEvent birthEvent = lifeDates.BirthEvent;
+                    GDMCustomEvent deathEvent = lifeDates.DeathEvent;
+                    string birthSign = ImportUtils.STD_BIRTH_SIGN;
+                    string deathSign = ImportUtils.STD_DEATH_SIGN;
+                    if (options.UseAdditionalDates) {
+                        if (birthEvent == null) {
+                            birthEvent = lifeDates.BaptismEvent;
+                            if (birthEvent != null) birthSign = ImportUtils.STD_BAPTISM_SIGN;
+                        }
+                        if (deathEvent == null) {
+                            deathEvent = lifeDates.BurialEvent;
+                            if (deathEvent != null) deathSign = ImportUtils.STD_BURIED_SIGN;
+                        }
+                    }
+
                     DateFormat dateFormat = (options.OnlyYears) ? DateFormat.dfYYYY : DateFormat.dfDD_MM_YYYY;
                     bool shortenDateRanges = options.ShortenDateRanges && options.OnlyYears;
 
-                    SetFlag(PersonFlag.pfIsDead, (lifeDates.DeathEvent != null));
+                    SetFlag(PersonFlag.pfIsDead, (deathEvent != null));
                     GlobalOptions glob = GlobalOptions.Instance;
-                    fBirthDate = GKUtils.GEDCOMEventToDateStr(lifeDates.BirthEvent, dateFormat, glob.ShowDatesSign, shortenDateRanges);
-                    fDeathDate = GKUtils.GEDCOMEventToDateStr(lifeDates.DeathEvent, dateFormat, glob.ShowDatesSign, shortenDateRanges);
+                    fBirthDate = GKUtils.GEDCOMEventToDateStr(birthEvent, dateFormat, glob.ShowDatesSign, shortenDateRanges);
+                    fDeathDate = GKUtils.GEDCOMEventToDateStr(deathEvent, dateFormat, glob.ShowDatesSign, shortenDateRanges);
 
                     if (options.ShowPlaces) {
-                        fBirthPlace = GKUtils.GetPlaceStr(lifeDates.BirthEvent, false, options.OnlyLocality);
+                        fBirthPlace = GKUtils.GetPlaceStr(birthEvent, false, options.OnlyLocality);
                         if (!string.IsNullOrEmpty(fBirthPlace) && !options.SeparateDatesAndPlacesLines) {
                             if (!string.IsNullOrEmpty(fBirthDate)) {
                                 fBirthDate += ", ";
@@ -312,7 +331,7 @@ namespace GKCore.Charts
                             fBirthDate += fBirthPlace;
                         }
 
-                        fDeathPlace = GKUtils.GetPlaceStr(lifeDates.DeathEvent, false, options.OnlyLocality);
+                        fDeathPlace = GKUtils.GetPlaceStr(deathEvent, false, options.OnlyLocality);
                         if (!string.IsNullOrEmpty(fDeathPlace) && !options.SeparateDatesAndPlacesLines) {
                             if (!string.IsNullOrEmpty(fDeathDate)) {
                                 fDeathDate += ", ";
@@ -328,11 +347,11 @@ namespace GKCore.Charts
                         fAge = "";
                     }
 
-                    if (!string.IsNullOrEmpty(fBirthDate)) {
-                        fBirthDate = ImportUtils.STD_BIRTH_SIGN + " " + fBirthDate;
+                    if (!string.IsNullOrEmpty(fBirthDate) && options.DateDesignations) {
+                        fBirthDate = birthSign + " " + fBirthDate;
                     }
-                    if (!string.IsNullOrEmpty(fDeathDate)) {
-                        fDeathDate = ImportUtils.STD_DEATH_SIGN + " " + fDeathDate;
+                    if (!string.IsNullOrEmpty(fDeathDate) && options.DateDesignations) {
+                        fDeathDate = deathSign + " " + fDeathDate;
                     }
 
                     if ((options.SignsVisible || options.URNotesVisible) && fRec.HasUserReferences) {
@@ -378,6 +397,18 @@ namespace GKCore.Charts
                     SetFlag(PersonFlag.pfBookmark, iRec.Bookmark);
 
                     CertaintyAssessment = GKUtils.GetCertaintyAssessment(iRec);
+
+                    if (options.TrackMatchedSources && fRec.HasSourceCitations) {
+                        int num = fRec.SourceCitations.Count;
+                        Sources = new GDMSourceCitation[num];
+                        for (int i = 0; i < num; i++) {
+                            var srcCit = fRec.SourceCitations[i];
+                            //string srcRef = srcCit.XRef /*+ ":" + srcCit.Page*/;
+                            Sources[i] = srcCit;
+                        }
+                    } else {
+                        Sources = new GDMSourceCitation[0];
+                    }
                 } else {
                     fSurname = "";
                     fName = "< ? >";
@@ -392,11 +423,82 @@ namespace GKCore.Charts
                     fSex = GDMSex.svUnknown;
 
                     CertaintyAssessment = 0.0f;
+                    Sources = new GDMSourceCitation[0];
                 }
             } catch (Exception ex) {
                 Logger.WriteError("TreeChartPerson.BuildBy()", ex);
                 throw;
             }
+        }
+
+        public void SetParents()
+        {
+            if (!fModel.Options.ParentAges || fRec == null) return;
+
+            FatherAge = string.Empty;
+            MotherAge = string.Empty;
+
+            GDMCustomEvent evtChild = fRec.FindEvent(GEDCOMTagName.BIRT);
+            if (evtChild == null || !evtChild.Date.GetUDN().HasKnownYear()) return;
+
+            if (Father != null && Father.Rec != null) {
+                var evtFth = Father.Rec.FindEvent(GEDCOMTagName.BIRT);
+                var diff = GKUtils.GetEventsYearsDiff(evtFth, evtChild, false);
+                FatherAge = (diff != -1) ? diff.ToString() : string.Empty;
+            }
+
+            if (Mother != null && Mother.Rec != null) {
+                var evtMth = Mother.Rec.FindEvent(GEDCOMTagName.BIRT);
+                var diff = GKUtils.GetEventsYearsDiff(evtMth, evtChild, false);
+                MotherAge = (diff != -1) ? diff.ToString() : string.Empty;
+            }
+        }
+
+        internal static int InitInfoSize(TreeChartOptions options)
+        {
+            int lines = 0;
+
+            if (options.FullNameOnOneLine) {
+                lines += 3;
+            } else {
+                if (options.FamilyVisible) {
+                    lines++;
+                }
+
+                if (!options.DiffLines) {
+                    lines++;
+                } else {
+                    lines++;
+                    lines++;
+                }
+            }
+
+            if (options.OnlyYears && !options.ShowPlaces) {
+                lines++;
+            } else {
+                if (options.BirthDateVisible) {
+                    lines++;
+                    if (options.SeparateDatesAndPlacesLines) {
+                        lines++;
+                    }
+                }
+                if (options.DeathDateVisible) {
+                    lines++;
+                    if (options.SeparateDatesAndPlacesLines) {
+                        lines++;
+                    }
+                }
+            }
+
+            if (options.Kinship) {
+                lines++;
+            }
+
+            if (options.URNotesVisible) {
+                lines++;
+            }
+
+            return lines;
         }
 
         private void InitInfo(int lines)
@@ -417,50 +519,68 @@ namespace GKCore.Charts
                 // create lines
                 int idx = 0;
 
-                if (options.SurnameFirstInOrder) {
-                    if (options.FamilyVisible) {
-                        Lines[idx] = fSurname;
+                if (options.FullNameOnOneLine) {
+                    if (options.SurnameFirstInOrder) {
                         NameLines++;
                         idx++;
-                    }
-
-                    if (!options.DiffLines) {
-                        Lines[idx] = nameLine + " " + fPatronymic; // attention: "Name" is combined property
-                        NameLines++;
-                        idx++;
+                        Lines[idx] = fSurname + " " + nameLine;
+                        NameLines += 2;
+                        idx += 2;
                     } else {
-                        Lines[idx] = nameLine;
                         NameLines++;
                         idx++;
-
-                        Lines[idx] = fPatronymic;
-                        NameLines++;
-                        idx++;
+                        Lines[idx] = nameLine + " " + fSurname;
+                        NameLines += 2;
+                        idx += 2;
                     }
                 } else {
-                    if (!options.DiffLines) {
-                        Lines[idx] = nameLine + " " + fPatronymic; // attention: "Name" is combined property
-                        NameLines++;
-                        idx++;
+                    if (options.SurnameFirstInOrder) {
+                        if (options.FamilyVisible) {
+                            Lines[idx] = fSurname;
+                            NameLines++;
+                            idx++;
+                        }
+
+                        if (!options.DiffLines) {
+                            Lines[idx] = nameLine + " " + fPatronymic; // attention: "Name" is combined property
+                            NameLines++;
+                            idx++;
+                        } else {
+                            Lines[idx] = nameLine;
+                            NameLines++;
+                            idx++;
+
+                            Lines[idx] = fPatronymic;
+                            NameLines++;
+                            idx++;
+                        }
                     } else {
-                        Lines[idx] = nameLine;
-                        NameLines++;
-                        idx++;
+                        if (!options.DiffLines) {
+                            Lines[idx] = nameLine + " " + fPatronymic; // attention: "Name" is combined property
+                            NameLines++;
+                            idx++;
+                        } else {
+                            Lines[idx] = nameLine;
+                            NameLines++;
+                            idx++;
 
-                        Lines[idx] = fPatronymic;
-                        NameLines++;
-                        idx++;
-                    }
+                            Lines[idx] = fPatronymic;
+                            NameLines++;
+                            idx++;
+                        }
 
-                    if (options.FamilyVisible) {
-                        Lines[idx] = fSurname;
-                        NameLines++;
-                        idx++;
+                        if (options.FamilyVisible) {
+                            Lines[idx] = fSurname;
+                            NameLines++;
+                            idx++;
+                        }
                     }
                 }
 
                 if (options.OnlyYears && !options.ShowPlaces) {
-                    string lifeYears = "[ ";
+                    string lifeYears = string.Empty;
+                    if (options.DateDesignations) lifeYears = "[ ";
+
                     lifeYears += (fBirthDate == "") ? "?" : fBirthDate;
                     if (HasFlag(PersonFlag.pfIsDead)) {
                         lifeYears += (fDeathDate == "") ? " - ?" : " - " + fDeathDate;
@@ -468,7 +588,8 @@ namespace GKCore.Charts
                     if (!string.IsNullOrEmpty(fAge)) {
                         lifeYears += string.Concat(" (", fAge, ")");
                     }
-                    lifeYears += " ]";
+
+                    if (options.DateDesignations) lifeYears += " ]";
 
                     Lines[idx] = lifeYears;
                     idx++;
@@ -632,6 +753,34 @@ namespace GKCore.Charts
                     break;
             }
             return result;
+        }
+
+        public bool IntersectSources(TreeChartPerson other)
+        {
+            //var results = this.Sources.Intersect(other.Sources, StringComparer.Ordinal);
+            //return results.Any();
+
+            for (int i = 0; i < Sources.Length; i++) {
+                var srcCit1 = Sources[i];
+
+                for (int k = 0; k < other.Sources.Length; k++) {
+                    var srcCit2 = other.Sources[k];
+
+                    if (string.Equals(srcCit1.XRef, srcCit2.XRef)) {
+                        /*int diff = SysUtils.StrDifference(srcCit1.Page, srcCit2.Page);
+                        // One family can be listed on 1-2 pages of a census or other source,
+                        // therefore the difference in page numbers should not exceed 1 character.
+                        // But what to do with cases like "p. 235" and "p. 235bck" ("л. 235" and "л. 235об")?
+                        if (diff == 0 || diff == 1) {
+                            return true;
+                        }*/
+
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
     }
 }
